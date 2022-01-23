@@ -1,7 +1,9 @@
 clear all 
 set more off
 capture ssc install fs
+capture ssc install carryforward
 
+capture log using "/storage/home/fxl146/work/Pyramids/carlos_1run" ,replace
 
 capture cd "C:\Users\carlo\Dropbox\India_Dev"
 
@@ -43,17 +45,17 @@ I do not drop age =15 and unemployed for labor reform
 */
 
 
-***** employment and id variables
-forvalues k=2014/2019 {
+****** Note to Faqiang: be careful about the raw file directory and working directory
+
+* employment and id variables
+forvalues k=2016/2018 {
 clear
-capture cd "/Users/faqiangmacpro/Dropbox/India_Dev/RawData/Pyramids/People_of_India/"
+capture cd "/storage/home/fxl146/scratch/Pyramids_statafiles/people_of_india"
 fs *`k'*.dta
 foreach ff in `r(files)' {
     append using `ff'
 }
 
-
-// only these have effective data values. Others only have identifiers.
 keep if response_status=="Accepted"  
 
 // Because normally Member of the household will only have effective data value
@@ -62,13 +64,15 @@ keep if member_status=="Member of the household"
 // Working age
 drop if age_yr<15
 
-cd "/Users/faqiangmacpro/Dropbox/India_Dev/Workspace"
-save year`k'_people_india, replace
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+save temp_carlos_`k'_people_india, replace
 }
-clear
 
+
+clear
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
 forvalues k=2016/2018 {
-append using year`k'_people_india
+append using temp_carlos_`k'_people_india
 }
 
 gen aux=nature=="Home Maker"|nature=="Student"|nature=="Unoccupied"|nature=="Retired/Aged"
@@ -83,13 +87,12 @@ gen date_m=monthly(month_slot, "MY")
 format date_m %tm
 egen id=group(hh_id mem_id)
 
-/*
-xtset id date_m 
+xtset id date_m
 
 tsfill 
 
 carryforward wave_no hh_id mem_id state hr district region_type stratum psu_id response_status reason_for_non_response mem_weight_w mem_weight_for_country_w mem_weight_for_state_w ge15_mem_weight_w ge15_mem_weight_for_country_w ge15_mem_weight_for_state_w mem_non_response_w mem_non_response_for_country_w mem_non_response_for_state_w ge15_mem_non_response_w ge15_mem_non_response_for_countr ge15_mem_non_response_for_state_ member_status gender age_yrs age_mths relation_with_hoh state_of_origin religion caste caste_category literacy education discipline nature_of_occupation industry_of_occupation employment_status is_healthy is_on_regular_medication is_hospitalised has_bank_ac has_creditcard has_kisan_creditcard has_demat_ac has_pf_ac has_lic has_health_insurance has_mobile family_shifted employment_status_since_yrs employment_status_since_mths employment_status_since_days type_of_employment employment_arrangement place_of_work time_to_start_working occupation reason_for_emigration_immigratio, replace
-*/
+
 
 replace month_slot=string(date_m, "%tm") if month_slot==""
 
@@ -107,78 +110,55 @@ replace month_slot="Nov "+substr(month_slot,1,4) if substr(month_slot,-3,.)=="m1
 replace month_slot="Dec "+substr(month_slot,1,4) if substr(month_slot,-3,.)=="m12"
 
 gen month=month_slot
-
-
-save employment_1618,replace
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+save carlos_employment_1618,replace
 
 keep hh_id 
+
 duplicates drop 
 
-save hhid_employment_1618,replace
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+save carlos_employment_1618_id, replace
 
 
 
-
-
+********* income and expenditure
 
 forvalues k=2016/2018 {
 clear
-capture cd "/Users/faqiangmacpro/Dropbox/India_Dev/RawData/Pyramids/People_of_India/"
+capture cd "/storage/home/fxl146/scratch/Pyramids_statafiles/member_income"
 fs *`k'*.dta
 foreach ff in `r(files)' {
     append using `ff'
 }
-
 
 // only these have effective data values. Others only have identifiers.
-keep if response_status=="Accepted"  
-
-// Because normally Member of the household will only have effective data value
-keep if member_status=="Member of the household"
-
-// Working age
-drop if age_yr<15
-
-cd "/Users/faqiangmacpro/Dropbox/India_Dev/Workspace"
-save year`k'_people_india, replace
-}
-clear
-
-forvalues k=2016/2018 {
-append using year`k'_people_india
-}
-
-******* income and expenditure variables
-
-forvalues k=2016/2018 {
-clear
-capture cd "/Users/faqiangmacpro/Dropbox/India_Dev/RawData/Pyramids/Member_income"
-fs *`k'*.dta
-foreach ff in `r(files)' {
-    append using `ff'
-}
 keep if response_status=="Accepted" 
 keep if member_status=="Member of the household"
 drop if age_yr<15
 
-merge m:1 hh_id using `id'
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+merge m:1 hh_id using carlos_employment_1618_id
 
 keep if _merge==3
 drop _merge
 
-tempfile year`k'
-save `year`k'' 
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+save temp_carlos_`k'_member_income, replace
 }
 clear
 
+
 forvalues k=2016/2018 {
-append using `year`k''
+append using temp_carlos_`k'_member_income
 }
 
-
-merge 1:m month hh_id mem_id using `employment'
+merge 1:m month hh_id mem_id using carlos_employment_1618
 keep if _merge==3
 drop _merge
+
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+save carlos_employment_income_1618,replace
 
 
 *** do a description of income by nature of occupation (do self-employed loose income?)
@@ -202,7 +182,7 @@ if length("`group'")<37 {
 local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.)'"," ","",.)'"	
 twoway tsline mean_income if nature=="Self Employed Entrepreneur" || tsline mean_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") rows(`rows')) 
 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_pair_wise_`name'.pdf, replace
+graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/mean_pair_wise_`name'.pdf, replace
 }	
 }
 
@@ -218,7 +198,7 @@ if length("`group'")<37 {
 }
 local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.)'"," ","",.)'"	
 twoway tsline median_income if nature=="Self Employed Entrepreneur" || tsline median_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_pair_wise_`name'.pdf, replace
+graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/median_pair_wise_`name'.pdf, replace
 }	
 }
 restore 
@@ -234,13 +214,13 @@ xtset self_employed date_m
 *mean self employed vs the rest comparison
 	
 twoway tsline mean_income if self_employed==1 || tsline mean_income if self_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_vstherest.pdf, replace
+graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/mean_vstherest.pdf, replace
 
 
 *median self employed vs the rest comparison 
 
 twoway tsline median_income if self_employed==1 || tsline median_income if self_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_vstherest.pdf, replace
+graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/median_vstherest.pdf, replace
 
 restore 
 
@@ -262,12 +242,12 @@ xtset id date_m
 *mean self employed vs the rest comparison
 
 twoway tsline mean_income if self_employed==1& industry_=="Machinery Manufacturers" || tsline mean_income if self_employed==0& industry_=="Machinery Manufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_machinery_manufacturers_vstherest.pdf, replace
+graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/mean_machinery_manufacturers_vstherest.pdf, replace
 
 *median self employed vs the rest comparison 
 
 twoway tsline median_income if self_employed==1& industry_=="Machinery Manufacturers" || tsline median_income if self_employed==0& industry_=="Machinery Manufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_machinery_manufacturers_vstherest.pdf, replace
+graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/median_machinery_manufacturers_vstherest.pdf, replace
 restore 
 
 /* I don't see a lot of evidence with just this grahs to say that there is a reduction on income of self-employees in general or compared to most groups

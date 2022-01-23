@@ -1,0 +1,833 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do explore_pyramids_faqiang.do 
+
+. clear all 
+
+. set more off
+
+. capture ssc install fs
+
+. capture ssc install carryforward
+
+. 
+. capture log using "/storage/home/fxl146/work/Pyramids/carlos_1run" ,replace
+
+. 
+. capture cd "C:\Users\carlo\Dropbox\India_Dev"
+
+. 
+. * Browse the dataset
+. /*
+> use people_of_india_20180101_20180430_r
+> br if response_status=="Non-Response"
+> br if member_status=="Emigrated"
+> br if member_status=="Emigrated" & reason_for_non_response=="No Failure"
+> tab reason_for_non_response member_status 
+> */
+. 
+. // then codebook and tab each occupation description
+. 
+. /*
+> - Identifiers, response rate, sampling unit identifier
+> - Locations
+> - Demographics: gender, age, hh role, origin, religion, case, education
+> - Labor: 
+>         -job status (what job, what industry, what position)
+>         -employment status (willingess, starting date of the employment, part
+> ime?, contract type. place of work, time to start working)
+> - Health: healthy? on medication? hospitalized (all binary variables)
+> - Credit acount (many) insturance and mobile phone: all binary
+>         
+> 
+> For variable list, this is useful
+> https://consumerpyramidsdx.cmie.com/kommon/bin/sr.php?kall=wlist
+> 
+> 
+> I see a lot of "not applicable, even for variable like literacy, gender..." -
+> -- a lot, 113,478, why
+> time_to_start_working --- what is this??????????
+> 
+> why not going from 2014??
+> could be confusing: dead/emigrated/family shifted can be "no failure", for th
+> ese data are are ver unavailable --- and their variable are highly unavilable
+>  as expected,,,, why ----- I think this is what happens: response rate is rec
+> orded at the household level while the membershipt status is member level ---
+> - and notice that, when the interview goes to some households, the family liv
+> ing their could be different from previous waves --- so that will be marked w
+> ith "no Failure" while at the same time "family shifted" 
+> 
+> work in workspace, should be exploiting the storage
+> 
+> I do not drop age =15 and unemployed for labor reform
+> */
+. 
+. 
+. ****** Note to Faqiang: be careful about the raw file directory and working d
+> irectory
+. 
+. * employment and id variables
+. forvalues k=2016/2018 {
+  2. clear
+  3. capture cd "/storage/home/fxl146/scratch/Pyramids_statafiles/people_of_ind
+> ia"
+  4. fs *`k'*.dta
+  5. foreach ff in `r(files)' {
+  6.     append using `ff'
+  7. }
+  8. 
+. keep if response_status=="Accepted"  
+  9. 
+. // Because normally Member of the household will only have effective data val
+> ue
+. keep if member_status=="Member of the household"
+ 10. 
+. // Working age
+. drop if age_yr<15
+ 11. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+ 12. save temp_carlos_`k'_people_india, replace
+ 13. }
+people_of_india_20160101_20160430_R.dta
+people_of_india_20160501_20160831_R.dta
+people_of_india_20160901_20161231_R.dta
+(357,333 observations deleted)
+(240,239 observations deleted)
+(342,412 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file temp_carlos_2016_people_india.dta saved
+people_of_india_20170101_20170430_R.dta
+people_of_india_20170501_20170831_R.dta
+people_of_india_20170901_20171231_R.dta
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+(391,423 observations deleted)
+(310,123 observations deleted)
+(313,438 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file temp_carlos_2017_people_india.dta saved
+people_of_india_20180901_20181231_R.dta
+people_of_india_20180101_20180430_R.dta
+people_of_india_20180501_20180831_R.dta
+(note: variable member_status was str25, now str27 to accommodate using
+       data's values)
+(349,656 observations deleted)
+(367,100 observations deleted)
+(320,421 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file temp_carlos_2018_people_india.dta saved
+
+. 
+. 
+. clear
+
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. forvalues k=2016/2018 {
+  2. append using temp_carlos_`k'_people_india
+  3. }
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+
+. 
+. gen aux=nature=="Home Maker"|nature=="Student"|nature=="Unoccupied"|nature=="
+> Retired/Aged"
+
+. 
+. bys hh_id mem_id: egen drop=min(aux)
+
+. 
+. drop if drop==1
+(1,925,045 observations deleted)
+
+. 
+. drop drop aux
+
+. 
+. gen date_m=monthly(month_slot, "MY")
+
+. format date_m %tm
+
+. egen id=group(hh_id mem_id)
+
+. 
+. xtset id date_m
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m12, but with gaps
+                delta:  1 month
+
+. 
+. tsfill 
+
+. 
+. carryforward wave_no hh_id mem_id state hr district region_type stratum psu_i
+> d response_status reason_for_non_response mem_weight_w mem_weight_for_country
+> _w mem_weight_for_state_w ge15_mem_weight_w ge15_mem_weight_for_country_w ge1
+> 5_mem_weight_for_state_w mem_non_response_w mem_non_response_for_country_w me
+> m_non_response_for_state_w ge15_mem_non_response_w ge15_mem_non_response_for_
+> countr ge15_mem_non_response_for_state_ member_status gender age_yrs age_mths
+>  relation_with_hoh state_of_origin religion caste caste_category literacy edu
+> cation discipline nature_of_occupation industry_of_occupation employment_stat
+> us is_healthy is_on_regular_medication is_hospitalised has_bank_ac has_credit
+> card has_kisan_creditcard has_demat_ac has_pf_ac has_lic has_health_insurance
+>  has_mobile family_shifted employment_status_since_yrs employment_status_sinc
+> e_mths employment_status_since_days type_of_employment employment_arrangement
+>  place_of_work time_to_start_working occupation reason_for_emigration_immigra
+> tio, replace
+wave_no:  (6,139,358 real changes made)
+hh_id:  (6,139,358 real changes made)
+mem_id:  (6,139,358 real changes made)
+state:  (6,139,358 real changes made)
+hr:  (6,139,358 real changes made)
+district:  (6,139,358 real changes made)
+region_type:  (6,139,358 real changes made)
+stratum:  (6,139,358 real changes made)
+psu_id:  (6,139,358 real changes made)
+response_status:  (6,139,358 real changes made)
+reason_for_non_response:  (6,139,358 real changes made)
+mem_weight_w:  (6,139,358 real changes made)
+mem_weight_for_country_w:  (6,139,358 real changes made)
+mem_weight_for_state_w:  (6,139,358 real changes made)
+ge15_mem_weight_w:  (6,139,358 real changes made)
+ge15_mem_weight_for_country_w:  (6,139,358 real changes made)
+ge15_mem_weight_for_state_w:  (6,139,358 real changes made)
+mem_non_response_w:  (6,139,358 real changes made)
+mem_non_response_for_country_w:  (6,139,358 real changes made)
+mem_non_response_for_state_w:  (6,139,358 real changes made)
+ge15_mem_non_response_w:  (6,139,358 real changes made)
+ge15_mem_non_response_for_countr:  (6,139,358 real changes made)
+ge15_mem_non_response_for_state_:  (6,139,358 real changes made)
+member_status:  (6,139,358 real changes made)
+gender:  (6,139,358 real changes made)
+age_yrs:  (6,139,358 real changes made)
+age_mths:  (6,139,358 real changes made)
+relation_with_hoh:  (6,139,358 real changes made)
+state_of_origin:  (6,139,358 real changes made)
+religion:  (6,139,358 real changes made)
+caste:  (6,139,358 real changes made)
+caste_category:  (6,139,358 real changes made)
+literacy:  (6,139,358 real changes made)
+education:  (6,139,358 real changes made)
+discipline:  (6,139,358 real changes made)
+nature_of_occupation:  (6,139,358 real changes made)
+industry_of_occupation:  (6,139,358 real changes made)
+employment_status:  (6,139,358 real changes made)
+is_healthy:  (6,139,358 real changes made)
+is_on_regular_medication:  (6,139,358 real changes made)
+is_hospitalised:  (6,139,358 real changes made)
+has_bank_ac:  (6,139,358 real changes made)
+has_creditcard:  (6,139,358 real changes made)
+has_kisan_creditcard:  (6,139,358 real changes made)
+has_demat_ac:  (6,139,358 real changes made)
+has_pf_ac:  (6,139,358 real changes made)
+has_lic:  (6,139,358 real changes made)
+has_health_insurance:  (6,139,358 real changes made)
+has_mobile:  (6,139,358 real changes made)
+family_shifted:  (6,369,202 real changes made)
+employment_status_since_yrs:  (6,601,286 real changes made)
+employment_status_since_mths:  (6,601,286 real changes made)
+employment_status_since_days:  (6,601,286 real changes made)
+type_of_employment:  (7,063,931 real changes made)
+employment_arrangement:  (7,063,931 real changes made)
+place_of_work:  (7,063,931 real changes made)
+time_to_start_working:  (7,063,931 real changes made)
+occupation:  (7,517,020 real changes made)
+reason_for_emigration_immigratio:  (7,756,360 real changes made)
+
+. 
+. 
+. replace month_slot=string(date_m, "%tm") if month_slot==""
+(6,139,358 real changes made)
+
+. 
+. replace month_slot="Jan "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m1"
+(402,283 real changes made)
+
+. replace month_slot="Feb "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m2"
+(455,927 real changes made)
+
+. replace month_slot="Mar "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m3"
+(508,397 real changes made)
+
+. replace month_slot="Apr "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m4"
+(566,149 real changes made)
+
+. replace month_slot="May "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m5"
+(573,207 real changes made)
+
+. replace month_slot="Jun "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m6"
+(566,633 real changes made)
+
+. replace month_slot="Jul "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m7"
+(565,218 real changes made)
+
+. replace month_slot="Aug "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m8"
+(571,850 real changes made)
+
+. replace month_slot="Sep "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m9"
+(568,372 real changes made)
+
+. replace month_slot="Oct "+substr(month_slot,1,4) if substr(month_slot,-3,.)==
+> "m10"
+(510,543 real changes made)
+
+. replace month_slot="Nov "+substr(month_slot,1,4) if substr(month_slot,-3,.)==
+> "m11"
+(451,566 real changes made)
+
+. replace month_slot="Dec "+substr(month_slot,1,4) if substr(month_slot,-3,.)==
+> "m12"
+(399,213 real changes made)
+
+. 
+. gen month=month_slot
+
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. save carlos_employment_1618,replace
+file carlos_employment_1618.dta saved
+
+. 
+. keep hh_id 
+
+. 
+. duplicates drop 
+
+Duplicates in terms of all variables
+
+(8,064,034 observations deleted)
+
+. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. save carlos_employment_1618_id, replace
+file carlos_employment_1618_id.dta saved
+
+. 
+. 
+. 
+. ********* income and expenditure
+. 
+. forvalues k=2016/2018 {
+  2. clear
+  3. capture cd "/storage/home/fxl146/scratch/Pyramids_statafiles/member_income
+> "
+  4. fs *`k'*.dta
+  5. foreach ff in `r(files)' {
+  6.     append using `ff'
+  7. }
+  8. 
+. // only these have effective data values. Others only have identifiers.
+. keep if response_status=="Accepted" 
+  9. keep if member_status=="Member of the household"
+ 10. drop if age_yr<15
+ 11. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+ 12. merge m:1 hh_id using carlos_employment_1618_id
+ 13. 
+. keep if _merge==3
+ 14. drop _merge
+ 15. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+ 16. save temp_carlos_`k'_member_income, replace
+ 17. }
+member_income_20160831_MS_rev.dta  member_income_20161031_MS_rev.dta
+member_income_20161231_MS_rev.dta  member_income_20160331_MS_rev.dta
+member_income_20160930_MS_rev.dta  member_income_20160531_MS_rev.dta
+member_income_20160229_MS_rev.dta  member_income_20160131_MS_rev.dta
+member_income_20160731_MS_rev.dta  member_income_20160430_MS_rev.dta
+member_income_20160630_MS_rev.dta  member_income_20161130_MS_rev.dta
+(note: variable income_of_member_from_interest was int, now long to
+       accommodate using data's values)
+(1,426,761 observations deleted)
+(1,049,894 observations deleted)
+(1,349,867 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                        95,003
+        from master                    71,609  (_merge==1)
+        from using                     23,394  (_merge==2)
+
+    matched                         5,106,830  (_merge==3)
+    -----------------------------------------
+(95,003 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file temp_carlos_2016_member_income.dta saved
+member_income_20170331_MS_rev.dta  member_income_20170131_MS_rev.dta
+member_income_20170731_MS_rev.dta  member_income_20171130_MS_rev.dta
+member_income_20170228_MS_rev.dta  member_income_20171231_MS_rev.dta
+member_income_20170630_MS_rev.dta  member_income_20170430_MS_rev.dta
+member_income_20171031_MS_rev.dta  member_income_20170531_MS_rev.dta
+member_income_20170831_MS_rev.dta  member_income_20170930_MS_rev.dta
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+(note: variable income_of_member_from_dividend was int, now long to
+       accommodate using data's values)
+(note: variable member_status was str25, now str27 to accommodate using
+       data's values)
+(note: variable income_of_member_from_interest was int, now long to
+       accommodate using data's values)
+(note: variable income_of_member_from_fd_pf_insu was int, now long to
+       accommodate using data's values)
+(1,555,462 observations deleted)
+(1,262,107 observations deleted)
+(1,247,176 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                        83,024
+        from master                    69,986  (_merge==1)
+        from using                     13,038  (_merge==2)
+
+    matched                         5,166,280  (_merge==3)
+    -----------------------------------------
+(83,024 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file temp_carlos_2017_member_income.dta saved
+member_income_20180430_MS_rev.dta  member_income_20180531_MS_rev.dta
+member_income_20180731_MS_rev.dta  member_income_20180331_MS_rev.dta
+member_income_20180630_MS_rev.dta  member_income_20180131_MS_rev.dta
+member_income_20180228_MS_rev.dta
+(789,221 observations deleted)
+(861,356 observations deleted)
+(751,335 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                        61,109
+        from master                    44,232  (_merge==1)
+        from using                     16,877  (_merge==2)
+
+    matched                         3,324,654  (_merge==3)
+    -----------------------------------------
+(61,109 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file temp_carlos_2018_member_income.dta saved
+
+. clear
+
+. 
+. 
+. forvalues k=2016/2018 {
+  2. append using temp_carlos_`k'_member_income
+  3. }
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+
+. 
+. merge 1:m month hh_id mem_id using carlos_employment_1618
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                     8,930,915
+        from master                 7,143,323  (_merge==1)
+        from using                  1,787,592  (_merge==2)
+
+    matched                         6,454,441  (_merge==3)
+    -----------------------------------------
+
+. keep if _merge==3
+(8,930,915 observations deleted)
+
+. drop _merge
+
+. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. save carlos_employment_income_1618,replace
+(note: file carlos_employment_income_1618.dta not found)
+file carlos_employment_income_1618.dta saved
+
+. 
+. 
+. *** do a description of income by nature of occupation (do self-employed loos
+> e income?)
+. preserve
+
+. collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income
+> _of_member_from_wages mean_pension=income_of_member_from_pension mean_dividen
+> d=income_of_member_from_dividend mean_interest=income_of_member_from_interest
+>  mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income
+> =income_of_member_from_all_source median_wage=income_of_member_from_wages med
+> ian_pension=income_of_member_from_pension median_dividend=income_of_member_fr
+> om_dividend median_interest=income_of_member_from_interest median_fd_pf_insur
+> ance=income_of_member_from_fd_pf_insu, by(date_m nature)
+
+. egen id=group(nature)
+
+. xtset id date_m
+       panel variable:  id (strongly balanced)
+        time variable:  date_m, 2016m1 to 2018m7
+                delta:  1 month
+
+. *** graphs with pairwise comparison of both mean and median income across sel
+> f-employed people and other groups
+. * july first implementation of gst
+. 
+. *mean pair-wise comparison
+. levelsof nature, local(class)
+`"Agricultural Labourer"' `"Businessman"' `"Home Maker"' `"Home-based Worker"' 
+> `"Industrial Workers"' `"Legislator/Social Worker/ Activists"' `"Manager"' `"
+> Non-Industrial Technical Employee"' `"Organised Farmer"' `"Qualified Self Emp
+> loyed Professionals"' `"Retired/Aged"' `"Self Employed Entrepreneur"' `"Small
+>  Farmer"' `"Small Trader/Hawker/ Businessman without Fixed Premises"' `"Stude
+> nt"' `"Support Staff"' `"Unoccupied"' `"Wage Labourer"' `"White Collar Cleric
+> al Employees"' `"White-Collar Professional Employees and Other Employees"'
+
+. foreach group of local class {
+  2. if "`group'"~="Self Employed Entrepreneur" {
+  3. if length("`group'")>36 {
+  4.         local rows 2    
+  5. }
+  6. if length("`group'")<37 {
+  7.         local rows 1
+  8. }
+  9. local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","
+> ",.)'"," ","",.)'"    
+ 10. twoway tsline mean_income if nature=="Self Employed Entrepreneur" || tslin
+> e mean_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(ti
+> tlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, l
+> absize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tle
+> ngth(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") ro
+> ws(`rows')) 
+ 11. 
+. graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Se
+> lf_Employed_Others/mean_pair_wise_`name'.pdf, replace
+ 12. }       
+ 13. }
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_AgriculturalLabourer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_Businessman.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_HomeMaker.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_HomebasedWorker.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_IndustrialWorkers.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_LegislatorSocialWorkerActivists.pdf written in PDF f
+> ormat)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_Manager.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_NonIndustrialTechnicalEmployee.pdf written in PDF fo
+> rmat)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_OrganisedFarmer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_QualifiedSelfEmployedProfessionals.pdf written in PD
+> F format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_RetiredAged.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_SmallFarmer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_SmallTraderHawkerBusinessmanwithoutFixedPremises.pdf
+>  written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_Student.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_SupportStaff.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_Unoccupied.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_WageLabourer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_WhiteCollarClericalEmployees.pdf written in PDF form
+> at)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_pair_wise_WhiteCollarProfessionalEmployeesandOtherEmployees.pd
+> f written in PDF format)
+
+. 
+. *median pair-wise comparison
+. levelsof nature, local(class)
+`"Agricultural Labourer"' `"Businessman"' `"Home Maker"' `"Home-based Worker"' 
+> `"Industrial Workers"' `"Legislator/Social Worker/ Activists"' `"Manager"' `"
+> Non-Industrial Technical Employee"' `"Organised Farmer"' `"Qualified Self Emp
+> loyed Professionals"' `"Retired/Aged"' `"Self Employed Entrepreneur"' `"Small
+>  Farmer"' `"Small Trader/Hawker/ Businessman without Fixed Premises"' `"Stude
+> nt"' `"Support Staff"' `"Unoccupied"' `"Wage Labourer"' `"White Collar Cleric
+> al Employees"' `"White-Collar Professional Employees and Other Employees"'
+
+. foreach group of local class {
+  2. if "`group'"~="Self Employed Entrepreneur" {
+  3. if length("`group'")>36 {
+  4.         local rows 2    
+  5. }
+  6. if length("`group'")<37 {
+  7.         local rows 1
+  8. }
+  9. local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","
+> ",.)'"," ","",.)'"    
+ 10. twoway tsline median_income if nature=="Self Employed Entrepreneur" || tsl
+> ine median_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscal
+> e(titlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20
+> , labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) 
+> tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'")
+>  rows(`rows')) 
+ 11. graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison
+> _Self_Employed_Others/median_pair_wise_`name'.pdf, replace
+ 12. }       
+ 13. }
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_AgriculturalLabourer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_Businessman.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_HomeMaker.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_HomebasedWorker.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_IndustrialWorkers.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_LegislatorSocialWorkerActivists.pdf written in PDF
+>  format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_Manager.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_NonIndustrialTechnicalEmployee.pdf written in PDF 
+> format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_OrganisedFarmer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_QualifiedSelfEmployedProfessionals.pdf written in 
+> PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_RetiredAged.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_SmallFarmer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_SmallTraderHawkerBusinessmanwithoutFixedPremises.p
+> df written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_Student.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_SupportStaff.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_Unoccupied.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_WageLabourer.pdf written in PDF format)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_WhiteCollarClericalEmployees.pdf written in PDF fo
+> rmat)
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_pair_wise_WhiteCollarProfessionalEmployeesandOtherEmployees.
+> pdf written in PDF format)
+
+. restore 
+
+. 
+. preserve
+
+. gen self_employed=nature=="Self Employed Entrepreneur"
+
+. collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income
+> _of_member_from_wages mean_pension=income_of_member_from_pension mean_dividen
+> d=income_of_member_from_dividend mean_interest=income_of_member_from_interest
+>  mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income
+> =income_of_member_from_all_source median_wage=income_of_member_from_wages med
+> ian_pension=income_of_member_from_pension median_dividend=income_of_member_fr
+> om_dividend median_interest=income_of_member_from_interest median_fd_pf_insur
+> ance=income_of_member_from_fd_pf_insu, by(date_m self_employed)
+
+. 
+. xtset self_employed date_m
+       panel variable:  self_employed (strongly balanced)
+        time variable:  date_m, 2016m1 to 2018m7
+                delta:  1 month
+
+. 
+. *** graphs with comparison of both mean and median income across self-employe
+> d people and other groups
+. 
+. *mean self employed vs the rest comparison
+.         
+. twoway tsline mean_income if self_employed==1 || tsline mean_income if self_e
+> mployed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Aver
+> age Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(
+> %tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) 
+> legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+
+. graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Se
+> lf_Employed_Others/mean_vstherest.pdf, replace
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_vstherest.pdf written in PDF format)
+
+. 
+. 
+. *median self employed vs the rest comparison 
+. 
+. twoway tsline median_income if self_employed==1 || tsline median_income if se
+> lf_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("
+> Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) form
+> at(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none
+> )) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+
+. graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Se
+> lf_Employed_Others/median_vstherest.pdf, replace
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_vstherest.pdf written in PDF format)
+
+. 
+. restore 
+
+. 
+. **** by industry
+. 
+. preserve
+
+. gen self_employed=nature_o=="Self Employed Entrepreneur"
+
+. bys hh_id mem_id: egen aux=max(self_employed)
+
+. keep if aux
+(4,537,743 observations deleted)
+
+. collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income
+> _of_member_from_wages mean_pension=income_of_member_from_pension mean_dividen
+> d=income_of_member_from_dividend mean_interest=income_of_member_from_interest
+>  mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income
+> =income_of_member_from_all_source median_wage=income_of_member_from_wages med
+> ian_pension=income_of_member_from_pension median_dividend=income_of_member_fr
+> om_dividend median_interest=income_of_member_from_interest median_fd_pf_insur
+> ance=income_of_member_from_fd_pf_insu, by(date_m industry self_employed)
+
+. 
+. encode industry, generate(industry)
+
+. 
+. egen id=group(industry self_employed)
+
+. xtset id date_m
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+
+. 
+. *** graphs with comparison of both mean and median income across self-employe
+> d people and other groups
+. 
+. *mean self employed vs the rest comparison
+. 
+. twoway tsline mean_income if self_employed==1& industry_=="Machinery Manufact
+> urers" || tsline mean_income if self_employed==0& industry_=="Machinery Manuf
+> acturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Avera
+> ge Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%
+> tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) l
+> egend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+
+. graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Se
+> lf_Employed_Others/mean_machinery_manufacturers_vstherest.pdf, replace
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/mean_machinery_manufacturers_vstherest.pdf written in PDF format)
+
+. 
+. *median self employed vs the rest comparison 
+. 
+. twoway tsline median_income if self_employed==1& industry_=="Machinery Manufa
+> cturers" || tsline median_income if self_employed==0& industry_=="Machinery M
+> anufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("A
+> verage Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) form
+> at(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none
+> )) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+
+. graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Se
+> lf_Employed_Others/median_machinery_manufacturers_vstherest.pdf, replace
+(file /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employ
+> ed_Others/median_machinery_manufacturers_vstherest.pdf written in PDF format)
+
+. restore 
+
+. 
+. /* I don't see a lot of evidence with just this grahs to say that there is a 
+> reduction on income of self-employees in general or compared to most groups
+>  we should probably look inside the industry of occupation, also porbably we 
+> can do a regression of income on education, gender, age, health, controlls,an
+> d industry-year fixed effects and then do these graphs on the residuals*/
+. 
+. *** do a survival analysis of employment arrangement (do self-employed switch
+>  out of self-employment more?)
+. 
+. gen post=date_m>tm(2017m6)
+
+. gen aux=dofm(date_m)
+
+. gen year=year(aux)
+
+. drop aux
+
+. ta nature, gen(nature_)
+
+                   NATURE_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                  Agricultural Labourer |    339,426        5.26        5.26
+                            Businessman |    364,634        5.65       10.91
+                             Home Maker |    764,458       11.84       22.75
+                      Home-based Worker |     59,133        0.92       23.67
+                     Industrial Workers |    224,036        3.47       27.14
+    Legislator/Social Worker/ Activists |      3,582        0.06       27.19
+                                Manager |     15,990        0.25       27.44
+      Non-Industrial Technical Employee |    152,642        2.36       29.81
+                       Organised Farmer |    203,712        3.16       32.96
+  Qualified Self Employed Professionals |     23,963        0.37       33.33
+                           Retired/Aged |    284,500        4.41       37.74
+             Self Employed Entrepreneur |    692,604       10.73       48.47
+                           Small Farmer |    500,563        7.76       56.23
+Small Trader/Hawker/ Businessman with.. |    205,914        3.19       59.42
+                                Student |    329,695        5.11       64.53
+                          Support Staff |    528,921        8.19       72.72
+                             Unoccupied |     68,510        1.06       73.78
+                          Wage Labourer |  1,149,530       17.81       91.59
+        White Collar Clerical Employees |    280,694        4.35       95.94
+White-Collar Professional Employees a.. |    261,934        4.06      100.00
+----------------------------------------+-----------------------------------
+                                  Total |  6,454,441      100.00
+
+. rename nature_11 nature_self
+
+. rename nature_16 nature_unoccupied
+
+. 
+. gen Lselfxpost=L.nature_self*post
+not sorted
+r(5);
+
+end of do-file
+r(5);

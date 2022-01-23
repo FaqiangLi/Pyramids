@@ -1,0 +1,134 @@
+{smcl}
+{com}{sf}{ul off}{txt}{.-}
+      name:  {res}<unnamed>
+       {txt}log:  {res}/storage/work/f/fxl146/Pyramids/scale_down_record_firstbatch.smcl
+  {txt}log type:  {res}smcl
+ {txt}opened on:  {res}23 Jan 2022, 02:36:57
+{txt}
+{com}. 
+. 
+. timer clear
+{txt}
+{com}. 
+. * Random sample
+. timer on 1
+{txt}
+{com}. use people_of_india_1419.dta,replace
+{txt}
+{com}. sample 1
+{txt}(8,123,080 observations deleted)
+
+{com}. save people_of_india_1419_oneprecent,replace
+{txt}file people_of_india_1419_oneprecent.dta saved
+
+{com}. use member_income_1419.dta, replace
+{txt}
+{com}. sample 1 
+{txt}(52,759,278 observations deleted)
+
+{com}. save member_income_1419_oneprecent, replace
+{txt}file member_income_1419_oneprecent.dta saved
+
+{com}. timer off 1
+{txt}
+{com}. 
+. 
+. * Shake off identifiers
+. * people_of_india: hh_id mem_id month_slot
+. * memeber_income: hh_id mem_id month_slot month
+. use member_income_1419, replace
+{txt}
+{com}. local extra_identifiers state hr district region_type stratum psu_id response_status reason_for_non_response mem_weight_ms mem_weight_for_country_ms mem_weight_for_state_ms mem_non_response_ms mem_non_response_for_country_ms mem_non_response_for_state_ms member_status
+{txt}
+{com}. drop `extra_identifiers'
+{txt}
+{com}. // Disaggregation level: hh_id mem_id month_slot
+. save member_income_1419_nomoreids, replace
+{txt}file member_income_1419_nomoreids.dta saved
+
+{com}. 
+. * Merge and append
+. clear
+{txt}
+{com}. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+{res}/gpfs/scratch/fxl146/Pyramids_statafiles
+{txt}
+{com}. use member_income_1419_nomoreids,replace
+{txt}
+{com}. merge m:1 hh_id mem_id month_slot using people_of_india_1419
+{res}
+{txt}{col 5}Result{col 38}# of obs.
+{col 5}{hline 41}
+{col 5}not matched{col 30}{res}       3,269,855
+{txt}{col 9}from master{col 30}{res}       2,069,472{txt}  (_merge==1)
+{col 9}from using{col 30}{res}       1,200,383{txt}  (_merge==2)
+
+{col 5}matched{col 30}{res}      51,222,728{txt}  (_merge==3)
+{col 5}{hline 41}
+
+{com}. drop if _merge==2
+{txt}(1,200,383 observations deleted)
+
+{com}. drop _merge
+{txt}
+{com}. egen id = group(hh_id mem_id)
+{res}{txt}
+{com}. sort hh_id mem_id month_slot month
+{txt}
+{com}. order id hh_id mem_id month_slot month
+{txt}
+{com}. save concise_1419_labor,replace
+{txt}file concise_1419_labor.dta saved
+
+{com}. 
+. 
+. * If works, continue to generate random sample to work with it.
+. use concise_1419_labor, replace
+{txt}
+{com}. sample 10
+{txt}(47,962,980 observations deleted)
+
+{com}. save concise_1419_labor_10p,replace
+{txt}(note: file concise_1419_labor_10p.dta not found)
+file concise_1419_labor_10p.dta saved
+
+{com}. use concise_1419_labor, replace
+{txt}
+{com}. sample 1
+{txt}(52,759,278 observations deleted)
+
+{com}. save concise_1419_labor_1p,replace
+{txt}(note: file concise_1419_labor_1p.dta not found)
+file concise_1419_labor_1p.dta saved
+
+{com}. use concise_1419_labor, replace
+{txt}
+{com}. sample 0.1
+{txt}(53,238,908 observations deleted)
+
+{com}. save concise_1419_labor_01p,replace
+{txt}(note: file concise_1419_labor_01p.dta not found)
+file concise_1419_labor_01p.dta saved
+
+{com}. 
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. log close
+      {txt}name:  {res}<unnamed>
+       {txt}log:  {res}/storage/work/f/fxl146/Pyramids/scale_down_record_firstbatch.smcl
+  {txt}log type:  {res}smcl
+ {txt}closed on:  {res}23 Jan 2022, 03:13:07
+{txt}{.-}
+{smcl}
+{txt}{sf}{ul off}

@@ -1,0 +1,174 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do clean_trim_merge_append_member_income.do 
+
+. clear
+
+. set more off
+
+. 
+. log using append_member_income
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /storage/work/f/fxl146/Pyramids/append_member_income.smcl
+  log type:  smcl
+ opened on:  23 Jan 2022, 00:13:56
+
+. 
+. local cluster_li_workspace /storage/home/fxl146/scratch/Pyramids_statafiles
+
+. 
+. 
+. forvalues k=2014/2019 {
+  2. clear
+  3. cd `cluster_li_workspace'
+  4. fs member_income_`k'*.dta
+  5. foreach ff in `r(files)' {
+  6.     append using `ff'
+  7. }
+  8. 
+. // only these have effective data values. Others only have identifiers.
+. keep if response_status=="Accepted"  
+  9. 
+. // Because normally Member of the household will only have effective data val
+> ue
+. keep if member_status=="Member of the household"
+ 10. 
+. // Working age
+. drop if age_yr<15
+ 11. 
+. cd `cluster_li_workspace'
+ 12. save member_income_`k', replace
+ 13. }
+/gpfs/scratch/fxl146/Pyramids_statafiles
+member_income_20140831_MS_rev.dta  member_income_20140930_MS_rev.dta
+member_income_2014.dta             member_income_20141031_MS_rev.dta
+member_income_20140131_MS_rev.dta  member_income_20140630_MS_rev.dta
+member_income_20141130_MS_rev.dta  member_income_20141231_MS_rev.dta
+member_income_20140731_MS_rev.dta  member_income_20140430_MS_rev.dta
+member_income_20140531_MS_rev.dta  member_income_20140331_MS_rev.dta
+member_income_20140228_MS_rev.dta
+(1,083,062 observations deleted)
+(369,532 observations deleted)
+(1,599,054 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file member_income_2014.dta saved
+/gpfs/scratch/fxl146/Pyramids_statafiles
+member_income_20150630_MS_rev.dta  member_income_20150131_MS_rev.dta
+member_income_20150228_MS_rev.dta  member_income_20151031_MS_rev.dta
+member_income_20151130_MS_rev.dta  member_income_20150831_MS_rev.dta
+member_income_20150331_MS_rev.dta  member_income_20150731_MS_rev.dta
+member_income_2015.dta             member_income_20150430_MS_rev.dta
+member_income_20151231_MS_rev.dta  member_income_20150531_MS_rev.dta
+member_income_20150930_MS_rev.dta
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+(1,239,525 observations deleted)
+(599,774 observations deleted)
+(1,385,786 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file member_income_2015.dta saved
+/gpfs/scratch/fxl146/Pyramids_statafiles
+member_income_20160831_MS_rev.dta  member_income_20160331_MS_rev.dta
+member_income_20161231_MS_rev.dta  member_income_20160531_MS_rev.dta
+member_income_20160930_MS_rev.dta  member_income_2016.dta
+member_income_20160229_MS_rev.dta  member_income_20160131_MS_rev.dta
+member_income_20160731_MS_rev.dta  member_income_20160430_MS_rev.dta
+member_income_20160630_MS_rev.dta  member_income_20161130_MS_rev.dta
+member_income_20161031_MS_rev.dta
+(note: variable income_of_member_from_interest was int, now long to
+       accommodate using data's values)
+(1,426,761 observations deleted)
+(1,049,894 observations deleted)
+(1,349,867 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file member_income_2016.dta saved
+/gpfs/scratch/fxl146/Pyramids_statafiles
+member_income_20170331_MS_rev.dta  member_income_20170131_MS_rev.dta
+member_income_20170731_MS_rev.dta  member_income_20171130_MS_rev.dta
+member_income_20170228_MS_rev.dta  member_income_20171231_MS_rev.dta
+member_income_20170630_MS_rev.dta  member_income_20170430_MS_rev.dta
+member_income_2017.dta             member_income_20170531_MS_rev.dta
+member_income_20171031_MS_rev.dta  member_income_20170930_MS_rev.dta
+member_income_20170831_MS_rev.dta
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+(note: variable income_of_member_from_dividend was int, now long to
+       accommodate using data's values)
+(note: variable member_status was str25, now str27 to accommodate using
+       data's values)
+(note: variable income_of_member_from_interest was int, now long to
+       accommodate using data's values)
+(note: variable income_of_member_from_fd_pf_insu was int, now long to
+       accommodate using data's values)
+(1,555,462 observations deleted)
+(1,262,107 observations deleted)
+(1,247,176 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file member_income_2017.dta saved
+/gpfs/scratch/fxl146/Pyramids_statafiles
+member_income_20180430_MS_rev.dta  member_income_20180228_MS_rev.dta
+member_income_20180731_MS_rev.dta  member_income_20180531_MS_rev.dta
+member_income_20180630_MS_rev.dta  member_income_20180331_MS_rev.dta
+member_income_2018.dta             member_income_20180131_MS_rev.dta
+(789,221 observations deleted)
+(861,356 observations deleted)
+(751,335 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file member_income_2018.dta saved
+/gpfs/scratch/fxl146/Pyramids_statafiles
+member_income_20191231_MS_rev.dta  member_income_20190831_MS_rev.dta
+member_income_20191130_MS_rev.dta  member_income_20191031_MS_rev.dta
+member_income_2019.dta             member_income_20190930_MS_rev.dta
+(858,732 observations deleted)
+(748,600 observations deleted)
+(426,417 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+file member_income_2019.dta saved
+
+. clear
+
+. 
+. timer clear
+
+. timer on 1
+
+. clear
+
+. forvalues k=2014/2019{
+  2.         append using member_income_`k'.dta
+  3. }
+
+. save member_income_1419,replace
+file member_income_1419.dta saved
+
+. timer off 1
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /storage/work/f/fxl146/Pyramids/append_member_income.smcl
+  log type:  smcl
+ closed on:  23 Jan 2022, 00:22:28
+-------------------------------------------------------------------------------
+
+. 
+end of do-file

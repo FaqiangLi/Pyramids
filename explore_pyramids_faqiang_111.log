@@ -1,0 +1,310 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do explore_pyramids_faqiang.do 
+
+. clear all 
+
+. set more off
+
+. capture ssc install fs
+
+. 
+. log using "/storage/home/fxl146/work/Pyramids/carlos_1run" ,replace
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /storage/home/fxl146/work/Pyramids/carlos_1run.smcl
+  log type:  smcl
+ opened on:  23 Jan 2022, 02:34:25
+
+. 
+. 
+. /*
+> 
+> capture cd "C:\Users\carlo\Dropbox\India_Dev"
+> 
+> * Browse the dataset
+> /*
+> use people_of_india_20180101_20180430_r
+> br if response_status=="Non-Response"
+> br if member_status=="Emigrated"
+> br if member_status=="Emigrated" & reason_for_non_response=="No Failure"
+> tab reason_for_non_response member_status 
+> */
+> 
+> // then codebook and tab each occupation description
+> 
+> /*
+> - Identifiers, response rate, sampling unit identifier
+> - Locations
+> - Demographics: gender, age, hh role, origin, religion, case, education
+> - Labor: 
+>         -job status (what job, what industry, what position)
+>         -employment status (willingess, starting date of the employment, part
+> ime?, contract type. place of work, time to start working)
+> - Health: healthy? on medication? hospitalized (all binary variables)
+> - Credit acount (many) insturance and mobile phone: all binary
+>         
+> 
+> For variable list, this is useful
+> https://consumerpyramidsdx.cmie.com/kommon/bin/sr.php?kall=wlist
+> 
+> 
+> I see a lot of "not applicable, even for variable like literacy, gender..." -
+> -- a lot, 113,478, why
+> time_to_start_working --- what is this??????????
+> 
+> why not going from 2014??
+> could be confusing: dead/emigrated/family shifted can be "no failure", for th
+> ese data are are ver unavailable --- and their variable are highly unavilable
+>  as expected,,,, why ----- I think this is what happens: response rate is rec
+> orded at the household level while the membershipt status is member level ---
+> - and notice that, when the interview goes to some households, the family liv
+> ing their could be different from previous waves --- so that will be marked w
+> ith "no Failure" while at the same time "family shifted" 
+> 
+> work in workspace, should be exploiting the storage
+> 
+> I do not drop age =15 and unemployed for labor reform
+> */
+> 
+> 
+> * employment and id variables
+> forvalues k=2016/2018 {
+> clear
+> capture cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+> fs people_of_india_`k'*.dta
+> foreach ff in `r(files)' {
+>     append using `ff'
+> }
+> 
+> 
+> // only these have effective data values. Others only have identifiers.
+> keep if response_status=="Accepted"  
+> 
+> // Because normally Member of the household will only have effective data val
+> ue
+> keep if member_status=="Member of the household"
+> 
+> // Working age
+> drop if age_yr<15
+> 
+> cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+> save temp_carlos_`k'_people_india, replace
+> }
+> clear
+> 
+> forvalues k=2016/2018 {
+> append using temp_carlos_`k'_people_india
+> }
+> 
+> 
+> gen aux=nature=="Home Maker"|nature=="Student"|nature=="Unoccupied"|nature=="
+> Retired/Aged"
+> 
+> bys hh_id mem_id: egen drop=min(aux)
+> 
+> drop if drop==1
+> 
+> drop drop aux
+> 
+> gen date_m=monthly(month_slot, "MY")
+> format date_m %tm
+> egen id=group(hh_id mem_id)
+> 
+> 
+> /*
+> xtset id date_m
+> 
+> tsfill 
+> 
+> carryforward wave_no hh_id mem_id state hr district region_type stratum psu_i
+> d response_status reason_for_non_response mem_weight_w mem_weight_for_country
+> _w mem_weight_for_state_w ge15_mem_weight_w ge15_mem_weight_for_country_w ge1
+> 5_mem_weight_for_state_w mem_non_response_w mem_non_response_for_country_w me
+> m_non_response_for_state_w ge15_mem_non_response_w ge15_mem_non_response_for_
+> countr ge15_mem_non_response_for_state_ member_status gender age_yrs age_mths
+>  relation_with_hoh state_of_origin religion caste caste_category literacy edu
+> cation discipline nature_of_occupation industry_of_occupation employment_stat
+> us is_healthy is_on_regular_medication is_hospitalised has_bank_ac has_credit
+> card has_kisan_creditcard has_demat_ac has_pf_ac has_lic has_health_insurance
+>  has_mobile family_shifted employment_status_since_yrs employment_status_sinc
+> e_mths employment_status_since_days type_of_employment employment_arrangement
+>  place_of_work time_to_start_working occupation reason_for_emigration_immigra
+> tio, replace
+> */
+> 
+> replace month_slot=string(date_m, "%tm") if month_slot==""
+> 
+> replace month_slot="Jan "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m1"
+> replace month_slot="Feb "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m2"
+> replace month_slot="Mar "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m3"
+> replace month_slot="Apr "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m4"
+> replace month_slot="May "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m5"
+> replace month_slot="Jun "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m6"
+> replace month_slot="Jul "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m7"
+> replace month_slot="Aug "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m8"
+> replace month_slot="Sep "+substr(month_slot,1,4) if substr(month_slot,-2,.)==
+> "m9"
+> replace month_slot="Oct "+substr(month_slot,1,4) if substr(month_slot,-3,.)==
+> "m10"
+> replace month_slot="Nov "+substr(month_slot,1,4) if substr(month_slot,-3,.)==
+> "m11"
+> replace month_slot="Dec "+substr(month_slot,1,4) if substr(month_slot,-3,.)==
+> "m12"
+> 
+> gen month=month_slot
+> 
+> save carlos_employment_1618,replace
+> 
+> keep hh_id 
+> 
+> duplicates drop 
+> 
+> save carlos_employment_1618_id, replace
+> 
+> */
+. 
+. forvalues k=2016/2018 {
+  2. clear
+  3. capture cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+  4. fs member_income_`k'*.dta
+  5. foreach ff in `r(files)' {
+  6.     append using `ff'
+  7. }
+  8. 
+. // only these have effective data values. Others only have identifiers.
+. keep if response_status=="Accepted" 
+  9. keep if member_status=="Member of the household"
+ 10. drop if age_yr<15
+ 11. 
+. merge m:1 hh_id using carlos_employment_1618_id
+ 12. 
+. keep if _merge==3
+ 13. drop _merge
+ 14. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+ 15. save temp_carlos_`k'_member_income, replace
+ 16. }
+member_income_20160831_MS_rev.dta  member_income_20160331_MS_rev.dta
+member_income_20161231_MS_rev.dta  member_income_20160531_MS_rev.dta
+member_income_20160930_MS_rev.dta  member_income_2016.dta
+member_income_20160229_MS_rev.dta  member_income_20160131_MS_rev.dta
+member_income_20160731_MS_rev.dta  member_income_20160430_MS_rev.dta
+member_income_20160630_MS_rev.dta  member_income_20161130_MS_rev.dta
+member_income_20161031_MS_rev.dta
+(note: variable income_of_member_from_interest was int, now long to
+       accommodate using data's values)
+(1,426,761 observations deleted)
+(1,049,894 observations deleted)
+(1,349,867 observations deleted)
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                       238,221
+        from master                   214,827  (_merge==1)
+        from using                     23,394  (_merge==2)
+
+    matched                        15,320,490  (_merge==3)
+    -----------------------------------------
+(238,221 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+(note: file temp_carlos_2016_member_income.dta not found)
+file temp_carlos_2016_member_income.dta saved
+member_income_20170331_MS_rev.dta  member_income_20170131_MS_rev.dta
+member_income_20170731_MS_rev.dta  member_income_20171130_MS_rev.dta
+member_income_20170228_MS_rev.dta  member_income_20171231_MS_rev.dta
+member_income_20170630_MS_rev.dta  member_income_20170430_MS_rev.dta
+member_income_2017.dta             member_income_20170531_MS_rev.dta
+member_income_20171031_MS_rev.dta  member_income_20170930_MS_rev.dta
+member_income_20170831_MS_rev.dta
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+(note: variable income_of_member_from_dividend was int, now long to
+       accommodate using data's values)
+(note: variable member_status was str25, now str27 to accommodate using
+       data's values)
+(note: variable income_of_member_from_interest was int, now long to
+       accommodate using data's values)
+(note: variable income_of_member_from_fd_pf_insu was int, now long to
+       accommodate using data's values)
+(1,555,462 observations deleted)
+(1,262,107 observations deleted)
+(1,247,176 observations deleted)
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                       222,996
+        from master                   209,958  (_merge==1)
+        from using                     13,038  (_merge==2)
+
+    matched                        15,498,840  (_merge==3)
+    -----------------------------------------
+(222,996 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+(note: file temp_carlos_2017_member_income.dta not found)
+file temp_carlos_2017_member_income.dta saved
+member_income_20180430_MS_rev.dta  member_income_20180228_MS_rev.dta
+member_income_20180731_MS_rev.dta  member_income_20180531_MS_rev.dta
+member_income_20180630_MS_rev.dta  member_income_20180331_MS_rev.dta
+member_income_2018.dta             member_income_20180131_MS_rev.dta
+(789,221 observations deleted)
+(861,356 observations deleted)
+(751,335 observations deleted)
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                       149,573
+        from master                   132,696  (_merge==1)
+        from using                     16,877  (_merge==2)
+
+    matched                         9,973,962  (_merge==3)
+    -----------------------------------------
+(149,573 observations deleted)
+/gpfs/scratch/fxl146/Pyramids_statafiles
+(note: file temp_carlos_2018_member_income.dta not found)
+file temp_carlos_2018_member_income.dta saved
+
+. clear
+
+. 
+. 
+. forvalues k=2016/2018 {
+  2. append using temp_carlos_`k'_member_income
+  3. }
+(note: variable state_of_origin was str18, now str25 to accommodate using
+       data's values)
+
+. 
+. merge 1:m month hh_id mem_id using carlos_employment_1618
+variables month hh_id mem_id do not uniquely identify observations in the
+    master data
+r(459);
+
+end of do-file
+r(459);
