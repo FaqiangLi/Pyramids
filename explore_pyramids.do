@@ -2,13 +2,9 @@ clear all
 set more off
 capture ssc install fs
 
-global dir_Li_data "/storage/home/fxl146/scratch/Pyramids_statafile"
-global dir_Li_working "/storage/home/fxl146/scratch/Pyramids_working"
 
-capture cd "C:\Users\carlo\Dropbox\India_Dev"
+cd "C:\Users\carlo\Dropbox\India_Dev"
 
-* Raw data directory
-capture cd `dir_Li_data'
 
 ***** employment and id variables
 forvalues k=2016/2018 {
@@ -240,23 +236,38 @@ gen aux=dofm(date_m)
 gen year=year(aux)
 drop aux
 ta nature, gen(nature_)
-rename nature_11 nature_self
-rename nature_16 nature_unoccupied
 
-gen Lselfxpost=L.nature_self*post
+rename nature_2 nature_business
+rename nature_5 nature_industrialw
+rename nature_10 nature_qualified
+rename nature_12 nature_self
+rename nature_14 nature_small
+rename nature_17 nature_unoccupied
+rename nature_18 nature_wage
 
-bys hh_id mem_id (date_m): gen past_self=sum(nature_self)
+gen nature_all=nature_business==1|nature_industrialw==1|nature_qualified==1|nature_self==1|nature_small==1
 
-replace past_self=past_self>0
+foreach xx in business industrialw qualified self small all wage{
+xtset id date_m
 
-gen past_selfxpost=past_self*post
+gen L`xx'xpost=L.nature_`xx'*post
+bys hh_id mem_id (date_m): gen past_`xx'=sum(nature_`xx')
+replace past_`xx'=past_`xx'>0
+gen past_`xx'xpost=past_`xx'*post
+
+}
 
 
-reghdfe nature_unoccupied L.nature_self Lselfxpost, a(hh_id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
-reghdfe nature_unoccupied L.nature_self Lselfxpost, a(id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
-reghdfe nature_unoccupied past_self past_selfxpost, a(hh_id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hh date)
-reghdfe nature_unoccupied past_self past_selfxpost, a(id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
+foreach xx in business industrialw qualified self small all wage {
+xtset id date_m
+
+reghdfe nature_unoccupied L.nature_`xx' L`xx'xpost, a(hh_id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
+reghdfe nature_unoccupied L.nature_`xx' L`xx'xpost, a(id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
+reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(hh_id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hh date)
+reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
+
+}
