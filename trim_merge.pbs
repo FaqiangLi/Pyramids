@@ -2,9 +2,9 @@
 #PBS -S /bin/bash
 #PBS -l nodes=1:ppn=20,walltime=48:00:00
 #PBS -l pmem=12gb
-#PBS -N carlos_1run
-#PBS -e carlos_1run_e.txt
-#PBS -o carlos_1run_o.txt
+#PBS -N trim_merge
+#PBS -e trim_merge_append_e.txt
+#PBS -o trim_merge_append_o.txt
 
 #PBS -j oe
 
@@ -38,7 +38,7 @@ echo " "
 
  
 
-# Load in matlab and knitro
+# Load in stata
 
 module purge
 
@@ -59,7 +59,7 @@ cd '/storage/work/fxl146/Pyramids/'
 
  
 
-stata -b do explore_pyramids_faqiang.do 
+stata -b do clean_trim_merge_append.do 
 
  
 

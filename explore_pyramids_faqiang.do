@@ -161,6 +161,7 @@ cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
 save carlos_employment_income_1618,replace
 
 
+
 *** do a description of income by nature of occupation (do self-employed loose income?)
 preserve
 collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income_of_member_from_wages mean_pension=income_of_member_from_pension mean_dividend=income_of_member_from_dividend mean_interest=income_of_member_from_interest mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income=income_of_member_from_all_source median_wage=income_of_member_from_wages median_pension=income_of_member_from_pension median_dividend=income_of_member_from_dividend median_interest=income_of_member_from_interest median_fd_pf_insurance=income_of_member_from_fd_pf_insu, by(date_m nature)
@@ -182,7 +183,7 @@ if length("`group'")<37 {
 local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.)'"," ","",.)'"	
 twoway tsline mean_income if nature=="Self Employed Entrepreneur" || tsline mean_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") rows(`rows')) 
 
-graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/mean_pair_wise_`name'.pdf, replace
+graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_pair_wise_`name'.pdf, replace
 }	
 }
 
@@ -198,7 +199,7 @@ if length("`group'")<37 {
 }
 local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.)'"," ","",.)'"	
 twoway tsline median_income if nature=="Self Employed Entrepreneur" || tsline median_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") rows(`rows')) 
-graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/median_pair_wise_`name'.pdf, replace
+graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_pair_wise_`name'.pdf, replace
 }	
 }
 restore 
@@ -214,13 +215,13 @@ xtset self_employed date_m
 *mean self employed vs the rest comparison
 	
 twoway tsline mean_income if self_employed==1 || tsline mean_income if self_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/mean_vstherest.pdf, replace
+graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_vstherest.pdf, replace
 
 
 *median self employed vs the rest comparison 
 
 twoway tsline median_income if self_employed==1 || tsline median_income if self_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/median_vstherest.pdf, replace
+graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_vstherest.pdf, replace
 
 restore 
 
@@ -242,12 +243,12 @@ xtset id date_m
 *mean self employed vs the rest comparison
 
 twoway tsline mean_income if self_employed==1& industry_=="Machinery Manufacturers" || tsline mean_income if self_employed==0& industry_=="Machinery Manufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/mean_machinery_manufacturers_vstherest.pdf, replace
+graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_machinery_manufacturers_vstherest.pdf, replace
 
 *median self employed vs the rest comparison 
 
 twoway tsline median_income if self_employed==1& industry_=="Machinery Manufacturers" || tsline median_income if self_employed==0& industry_=="Machinery Manufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export /storage/home/fxl146/work/Pyramids/Graphs/Pyramids_Comparison_Self_Employed_Others/median_machinery_manufacturers_vstherest.pdf, replace
+graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_machinery_manufacturers_vstherest.pdf, replace
 restore 
 
 /* I don't see a lot of evidence with just this grahs to say that there is a reduction on income of self-employees in general or compared to most groups
@@ -260,23 +261,38 @@ gen aux=dofm(date_m)
 gen year=year(aux)
 drop aux
 ta nature, gen(nature_)
-rename nature_11 nature_self
-rename nature_16 nature_unoccupied
 
-gen Lselfxpost=L.nature_self*post
+rename nature_2 nature_business
+rename nature_5 nature_industrialw
+rename nature_10 nature_qualified
+rename nature_12 nature_self
+rename nature_14 nature_small
+rename nature_17 nature_unoccupied
+rename nature_18 nature_wage
 
-bys hh_id mem_id (date_m): gen past_self=sum(nature_self)
+gen nature_all=nature_business==1|nature_industrialw==1|nature_qualified==1|nature_self==1|nature_small==1
 
-replace past_self=past_self>0
+foreach xx in business industrialw qualified self small all wage{
+xtset id date_m
 
-gen past_selfxpost=past_self*post
+gen L`xx'xpost=L.nature_`xx'*post
+bys hh_id mem_id (date_m): gen past_`xx'=sum(nature_`xx')
+replace past_`xx'=past_`xx'>0
+gen past_`xx'xpost=past_`xx'*post
+
+}
 
 
-reghdfe nature_unoccupied L.nature_self Lselfxpost, a(hh_id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
-reghdfe nature_unoccupied L.nature_self Lselfxpost, a(id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
-reghdfe nature_unoccupied past_self past_selfxpost, a(hh_id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hh date)
-reghdfe nature_unoccupied past_self past_selfxpost, a(id date_m) vce(cl id)
-outreg2 using Tables\self_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
+foreach xx in business industrialw qualified self small all wage {
+xtset id date_m
+
+reghdfe nature_unoccupied L.nature_`xx' L`xx'xpost, a(hh_id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
+reghdfe nature_unoccupied L.nature_`xx' L`xx'xpost, a(id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
+reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(hh_id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hh date)
+reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(id date_m) vce(cl id)
+outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
+
+}
