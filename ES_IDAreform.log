@@ -1,0 +1,554 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do ES_IDAreform.do 
+
+. *** Event study Industrial Dispute Act labor reform on various outcomes
+. 
+. clear
+
+. set more off
+
+. 
+. log using "/storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl", replace
+(note: file /storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl not found)
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl
+  log type:  smcl
+ opened on:   2 Feb 2022, 02:43:52
+
+. 
+. 
+. * identifiers
+. // i : individual (a hh_id-mem-id)
+. // t : period (a month slot in the base dataset)
+. // s : state i lives in 
+. // d : district i lives in 
+. // hr: homogenous region i lives in 
+. 
+. * caveat
+. // Aspirational India and consumption data have not incorporated in. They are
+>  at the household levels. 
+. 
+. // note that people of india has every possible month because some households
+>  are asked in different month in a wave.
+. 
+. * Sample from people of India (see clean_trim_merge_append.do)
+. clear
+
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. use concise_1419_labor,replace
+
+. 
+. * reformat dates
+. gen date=date(month_slot, "MY")
+
+. format date %d
+
+. drop month_slot
+
+. 
+. rename month month_of_income
+
+. 
+. sort id hh_id mem_id date month_of_income
+
+. order id hh_id mem_id date month_of_income
+
+. 
+. * rename
+. rename income_of_member_from_* inc_*
+
+. 
+. * Now, the income at the exact same date as in people of india. 
+. foreach var in inc_all_source inc_wages inc_pension inc_dividend inc_interest
+> {
+  2.         bysort id date: egen mean_`var' = mean(`var')
+  3. }
+(2,304,768 missing values generated)
+(2,304,768 missing values generated)
+(2,304,768 missing values generated)
+
+. bysort id date: keep if _n==1
+(45,924,459 observations deleted)
+
+. 
+. * Treatment status: IDA is informed in s-t 
+. gen reformed = 0
+
+. replace reformed = 1 if state_of_origin == "Maharashtra" & ((month(date) >= 1
+> 1 & year(date) == 2017) | year(date)>2017 )
+(259,732 real changes made)
+
+. replace reformed = 1 if state_of_origin == "Rajasthan" & ( (month(date) >= 11
+>  & year(date)==2014) | year(date)>2014  )
+(407,553 real changes made)
+
+. replace reformed = 1 if state_of_origin == "Madhya Pradesh" &  ( (month(date)
+>  >=11 & year(date)==2015) | year(date)>2015 )
+(264,229 real changes made)
+
+. replace reformed = 1 if state_of_origin == "Haryana" & ( (month(date) >=3 & y
+> ear(date)==2016) | year(date)>2016 )
+(156,426 real changes made)
+
+. replace reformed = 1 if state_of_origin == "Gujarat" &  ( (month(date) >=9 & 
+> year(date)==2020) | year(date)>2020 )
+(0 real changes made)
+
+. replace reformed = 1 if state_of_origin == "Assam" &  ( (month(date) >=9 & ye
+> ar(date)==2017) | year(date)>2017 )
+(20,454 real changes made)
+
+. 
+. 
+. * Treatment moderation variables, e.g. industry of jobs
+. 
+. 
+. * 
+. codebook reformed
+
+-------------------------------------------------------------------------------
+reformed                                                            (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/7,367,741
+
+            tabulation:  Freq.  Value
+                     6,259,347  0
+                     1,108,394  1
+
+. sum reformed, detail
+
+                          reformed
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%            0              0       Obs           7,367,741
+25%            0              0       Sum of Wgt.   7,367,741
+
+50%            0                      Mean           .1504388
+                        Largest       Std. Dev.       .357501
+75%            0              1
+90%            1              1       Variance        .127807
+95%            1              1       Skewness       1.955582
+99%            1              1       Kurtosis         4.8243
+
+. tab reformed
+
+   reformed |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |  6,259,347       84.96       84.96
+          1 |  1,108,394       15.04      100.00
+------------+-----------------------------------
+      Total |  7,367,741      100.00
+
+. tab state_of_origin reformed  // basically we want both before and after trea
+> tment status for a state
+
+                      |       reformed
+      STATE_OF_ORIGIN |         0          1 |     Total
+----------------------+----------------------+----------
+Andaman & Nicobar I.. |         4          0 |         4 
+       Andhra Pradesh |   438,440          0 |   438,440 
+    Arunachal Pradesh |        37          0 |        37 
+                Assam |    37,329     20,454 |    57,783 
+                Bihar |   439,105          0 |   439,105 
+           Chandigarh |     6,796          0 |     6,796 
+         Chhattisgarh |   218,921          0 |   218,921 
+          Daman & Diu |        22          0 |        22 
+                Delhi |    62,105          0 |    62,105 
+              Foreign |        82          0 |        82 
+                  Goa |    41,308          0 |    41,308 
+              Gujarat |   388,602          0 |   388,602 
+              Haryana |    98,590    156,426 |   255,016 
+     Himachal Pradesh |    56,908          0 |    56,908 
+                India |       205          0 |       205 
+      Jammu & Kashmir |   111,251          0 |   111,251 
+            Jharkhand |   178,789          0 |   178,789 
+            Karnataka |   415,784          0 |   415,784 
+               Kerala |   182,660          0 |   182,660 
+       Madhya Pradesh |   134,449    264,229 |   398,678 
+          Maharashtra |   546,394    259,732 |   806,126 
+              Manipur |        41          0 |        41 
+            Meghalaya |    12,205          0 |    12,205 
+              Mizoram |        18          0 |        18 
+             Nagaland |        18          0 |        18 
+               Odisha |   242,976          0 |   242,976 
+           Puducherry |    50,410          0 |    50,410 
+               Punjab |   281,751          0 |   281,751 
+            Rajasthan |    72,552    407,553 |   480,105 
+               Sikkim |     2,090          0 |     2,090 
+           Tamil Nadu |   422,956          0 |   422,956 
+            Telangana |    66,574          0 |    66,574 
+              Tripura |    15,925          0 |    15,925 
+        Uttar Pradesh | 1,180,783          0 | 1,180,783 
+          Uttarakhand |    79,187          0 |    79,187 
+          West Bengal |   474,080          0 |   474,080 
+----------------------+----------------------+----------
+                Total | 6,259,347  1,108,394 | 7,367,741 
+
+. tab industry_of_occupation reformed
+
+INDUSTRY_OF_OCCUPATIO |       reformed
+                    N |         0          1 |     Total
+----------------------+----------------------+----------
+Agriculture- allied.. |     2,533        807 |     3,340 
+Automobiles and Oth.. |    23,243      2,945 |    26,188 
+Cement, Tiles, Bric.. |    55,709      3,311 |    59,020 
+  Chemical Industries |    21,387      2,773 |    24,160 
+Communication, Post.. |    16,626      1,586 |    18,212 
+     Crop Cultivation |   384,000     92,219 |   476,219 
+     Defence Services |    10,166      1,238 |    11,404 
+            Education |    99,796     25,754 |   125,550 
+Entertainment and S.. |     3,563        541 |     4,104 
+   Financial Services |    49,338     10,132 |    59,470 
+              Fishing |     5,529        276 |     5,805 
+      Food Industries |    54,840      6,481 |    61,321 
+Footwear and other .. |    12,683      1,646 |    14,329 
+Forestry including .. |     1,122        129 |     1,251 
+Fruits and Vegetabl.. |    40,534      3,791 |    44,325 
+     Gems & Jewellery |    12,009      2,014 |    14,023 
+Handicraft Industries |     4,622      1,038 |     5,660 
+          Health Care |    30,392      5,580 |    35,972 
+Hotels and Restaura.. |    30,845      5,665 |    36,510 
+            IT & ITES |    20,343      1,867 |    22,210 
+Machinery Manufactu.. |    37,922      3,352 |    41,274 
+ Media and Publishing |     5,809        876 |     6,685 
+     Metal Industries |    57,329      4,396 |    61,725 
+                Mines |    11,473      3,134 |    14,607 
+       Not Applicable | 3,184,404    674,619 | 3,859,023 
+Personal Non-Profes.. |   144,902     29,179 |   174,081 
+Personal Profession.. |    21,650      3,097 |    24,747 
+Pharmaceutical Manu.. |     8,207        985 |     9,192 
+Plantation Crop Cul.. |     1,934        265 |     2,199 
+Poultry Farming, An.. |    11,055        663 |    11,718 
+Public Administrati.. |    84,992     13,697 |    98,689 
+Real Estate & Const.. |   351,023     80,688 |   431,711 
+         Retail Trade |   343,860     82,655 |   426,515 
+Soaps, Detergents, .. |     7,667      1,020 |     8,687 
+   Textile Industries |    83,535     11,272 |    94,807 
+   Travel and Tourism |   137,174     20,459 |   157,633 
+            Utilities |    19,105      2,484 |    21,589 
+      Wholesale Trade |    31,897      5,760 |    37,657 
+----------------------+----------------------+----------
+                Total | 5,423,218  1,108,394 | 6,531,612 
+
+. local list_states_treated Maharashtra "Madhya Pradesh" Rajasthan Haryana Guja
+> rat Assam
+
+. foreach var in `list_states_treated'{
+  2.         disp("Current State is `var'")
+  3. tab industry_of_occupation if state_of_origin =="`var'"
+  4. }
+Current State is Maharashtra
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        412        0.06        0.06
+Automobiles and Other Transport Equip.. |      4,724        0.65        0.71
+Cement, Tiles, Bricks, Ceramics, Glas.. |      1,860        0.26        0.96
+                    Chemical Industries |      3,821        0.53        1.49
+          Communication, Post & Courier |      1,669        0.23        1.72
+                       Crop Cultivation |     81,811       11.27       12.99
+                       Defence Services |        641        0.09       13.08
+                              Education |     12,365        1.70       14.78
+               Entertainment and Sports |        518        0.07       14.86
+                     Financial Services |     11,644        1.60       16.46
+                                Fishing |        784        0.11       16.57
+                        Food Industries |      4,477        0.62       17.19
+  Footwear and other Leather Industries |        734        0.10       17.29
+        Forestry including Wood Cutting |         81        0.01       17.30
+           Fruits and Vegetable Farming |     10,122        1.39       18.69
+                       Gems & Jewellery |      1,010        0.14       18.83
+                  Handicraft Industries |        383        0.05       18.88
+                            Health Care |      4,291        0.59       19.48
+                 Hotels and Restaurants |      5,059        0.70       20.17
+                              IT & ITES |      2,350        0.32       20.50
+                Machinery Manufacturers |      7,601        1.05       21.54
+                   Media and Publishing |      1,276        0.18       21.72
+                       Metal Industries |      5,730        0.79       22.51
+                                  Mines |        727        0.10       22.61
+                         Not Applicable |    408,174       56.24       78.85
+     Personal Non-Professional Services |     21,110        2.91       81.76
+         Personal Professional Services |      2,707        0.37       82.13
+            Pharmaceutical Manufacturer |      1,756        0.24       82.37
+            Plantation Crop Cultivation |         88        0.01       82.39
+Poultry Farming, Animal Husbandry and.. |        836        0.12       82.50
+         Public Administrative Services |     11,520        1.59       84.09
+             Real Estate & Construction |     39,750        5.48       89.57
+                           Retail Trade |     36,121        4.98       94.54
+Soaps, Detergents, Cosmetics, Toiletr.. |        705        0.10       94.64
+                     Textile Industries |     10,041        1.38       96.02
+                     Travel and Tourism |     21,960        3.03       99.05
+                              Utilities |      2,855        0.39       99.44
+                        Wholesale Trade |      4,045        0.56      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    725,758      100.00
+Current State is Madhya Pradesh
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        176        0.05        0.05
+Automobiles and Other Transport Equip.. |        664        0.19        0.24
+Cement, Tiles, Bricks, Ceramics, Glas.. |      2,417        0.69        0.93
+                    Chemical Industries |        650        0.18        1.11
+          Communication, Post & Courier |        517        0.15        1.26
+                       Crop Cultivation |     36,999       10.53       11.78
+                       Defence Services |        286        0.08       11.86
+                              Education |      7,991        2.27       14.14
+               Entertainment and Sports |        202        0.06       14.20
+                     Financial Services |      2,336        0.66       14.86
+                                Fishing |         43        0.01       14.87
+                        Food Industries |      5,457        1.55       16.42
+  Footwear and other Leather Industries |        665        0.19       16.61
+        Forestry including Wood Cutting |        107        0.03       16.64
+           Fruits and Vegetable Farming |      3,487        0.99       17.64
+                       Gems & Jewellery |        422        0.12       17.76
+                  Handicraft Industries |        611        0.17       17.93
+                            Health Care |      1,333        0.38       18.31
+                 Hotels and Restaurants |      2,084        0.59       18.90
+                              IT & ITES |        238        0.07       18.97
+                Machinery Manufacturers |      2,001        0.57       19.54
+                   Media and Publishing |        222        0.06       19.60
+                       Metal Industries |      1,086        0.31       19.91
+                                  Mines |      3,125        0.89       20.80
+                         Not Applicable |    208,286       59.25       80.05
+     Personal Non-Professional Services |     12,169        3.46       83.51
+         Personal Professional Services |      1,258        0.36       83.87
+            Pharmaceutical Manufacturer |        222        0.06       83.93
+            Plantation Crop Cultivation |        131        0.04       83.97
+Poultry Farming, Animal Husbandry and.. |        331        0.09       84.07
+         Public Administrative Services |      3,988        1.13       85.20
+             Real Estate & Construction |     16,346        4.65       89.85
+                           Retail Trade |     22,092        6.28       96.13
+Soaps, Detergents, Cosmetics, Toiletr.. |      2,046        0.58       96.72
+                     Textile Industries |      4,319        1.23       97.94
+                     Travel and Tourism |      4,871        1.39       99.33
+                              Utilities |        755        0.21       99.55
+                        Wholesale Trade |      1,599        0.45      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    351,532      100.00
+Current State is Rajasthan
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        140        0.03        0.03
+Automobiles and Other Transport Equip.. |        766        0.18        0.21
+Cement, Tiles, Bricks, Ceramics, Glas.. |      1,677        0.40        0.61
+                    Chemical Industries |        568        0.13        0.74
+          Communication, Post & Courier |        509        0.12        0.87
+                       Crop Cultivation |     21,276        5.03        5.89
+                       Defence Services |        484        0.11        6.01
+                              Education |     12,092        2.86        8.87
+               Entertainment and Sports |        171        0.04        8.91
+                     Financial Services |      2,736        0.65        9.55
+                                Fishing |         40        0.01        9.56
+                        Food Industries |      2,306        0.55       10.11
+  Footwear and other Leather Industries |        359        0.08       10.19
+        Forestry including Wood Cutting |         65        0.02       10.21
+           Fruits and Vegetable Farming |        636        0.15       10.36
+                       Gems & Jewellery |      1,303        0.31       10.67
+                  Handicraft Industries |        264        0.06       10.73
+                            Health Care |      2,343        0.55       11.28
+                 Hotels and Restaurants |      1,503        0.36       11.64
+                              IT & ITES |        110        0.03       11.66
+                Machinery Manufacturers |        815        0.19       11.86
+                   Media and Publishing |        139        0.03       11.89
+                       Metal Industries |        841        0.20       12.09
+                                  Mines |        925        0.22       12.31
+                         Not Applicable |    262,407       62.03       74.33
+     Personal Non-Professional Services |      6,650        1.57       75.90
+         Personal Professional Services |      1,463        0.35       76.25
+            Pharmaceutical Manufacturer |         95        0.02       76.27
+            Plantation Crop Cultivation |          7        0.00       76.27
+Poultry Farming, Animal Husbandry and.. |        102        0.02       76.30
+         Public Administrative Services |      4,821        1.14       77.44
+             Real Estate & Construction |     47,724       11.28       88.72
+                           Retail Trade |     34,387        8.13       96.85
+Soaps, Detergents, Cosmetics, Toiletr.. |        347        0.08       96.93
+                     Textile Industries |      3,730        0.88       97.81
+                     Travel and Tourism |      6,312        1.49       99.30
+                              Utilities |      1,097        0.26       99.56
+                        Wholesale Trade |      1,853        0.44      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    423,063      100.00
+Current State is Haryana
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        101        0.05        0.05
+Automobiles and Other Transport Equip.. |      1,183        0.53        0.58
+Cement, Tiles, Bricks, Ceramics, Glas.. |        699        0.31        0.89
+                    Chemical Industries |        585        0.26        1.15
+          Communication, Post & Courier |        694        0.31        1.46
+                       Crop Cultivation |     11,318        5.08        6.54
+                       Defence Services |        597        0.27        6.81
+                              Education |      4,786        2.15        8.96
+               Entertainment and Sports |         91        0.04        9.00
+                     Financial Services |      2,396        1.08       10.07
+                        Food Industries |      1,333        0.60       10.67
+  Footwear and other Leather Industries |        644        0.29       10.96
+        Forestry including Wood Cutting |         12        0.01       10.97
+           Fruits and Vegetable Farming |        514        0.23       11.20
+                       Gems & Jewellery |        117        0.05       11.25
+                  Handicraft Industries |         17        0.01       11.26
+                            Health Care |      1,187        0.53       11.79
+                 Hotels and Restaurants |        754        0.34       12.13
+                              IT & ITES |      1,228        0.55       12.68
+                Machinery Manufacturers |      1,238        0.56       13.24
+                   Media and Publishing |        177        0.08       13.31
+                       Metal Industries |      1,372        0.62       13.93
+                                  Mines |        103        0.05       13.98
+                         Not Applicable |    142,346       63.88       77.85
+     Personal Non-Professional Services |      2,269        1.02       78.87
+         Personal Professional Services |        755        0.34       79.21
+            Pharmaceutical Manufacturer |        217        0.10       79.31
+            Plantation Crop Cultivation |         24        0.01       79.32
+Poultry Farming, Animal Husbandry and.. |        212        0.10       79.41
+         Public Administrative Services |      4,640        2.08       81.50
+             Real Estate & Construction |     12,744        5.72       87.21
+                           Retail Trade |     18,928        8.49       95.71
+Soaps, Detergents, Cosmetics, Toiletr.. |        203        0.09       95.80
+                     Textile Industries |      2,919        1.31       97.11
+                     Travel and Tourism |      3,290        1.48       98.59
+                              Utilities |        558        0.25       98.84
+                        Wholesale Trade |      2,595        1.16      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    222,846      100.00
+Current State is Gujarat
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |         65        0.02        0.02
+Automobiles and Other Transport Equip.. |      1,042        0.30        0.32
+Cement, Tiles, Bricks, Ceramics, Glas.. |      1,226        0.35        0.67
+                    Chemical Industries |      3,488        1.01        1.68
+          Communication, Post & Courier |        802        0.23        1.91
+                       Crop Cultivation |     33,351        9.63       11.54
+                       Defence Services |        160        0.05       11.59
+                              Education |      2,736        0.79       12.38
+               Entertainment and Sports |        253        0.07       12.45
+                     Financial Services |      2,433        0.70       13.15
+                                Fishing |        127        0.04       13.19
+                        Food Industries |      1,818        0.52       13.71
+  Footwear and other Leather Industries |        212        0.06       13.77
+        Forestry including Wood Cutting |         31        0.01       13.78
+           Fruits and Vegetable Farming |      1,769        0.51       14.29
+                       Gems & Jewellery |      3,683        1.06       15.36
+                  Handicraft Industries |        271        0.08       15.43
+                            Health Care |      1,829        0.53       15.96
+                 Hotels and Restaurants |      1,790        0.52       16.48
+                              IT & ITES |        293        0.08       16.56
+                Machinery Manufacturers |      2,671        0.77       17.34
+                   Media and Publishing |        304        0.09       17.42
+                       Metal Industries |      6,636        1.92       19.34
+                                  Mines |        224        0.06       19.40
+                         Not Applicable |    192,924       55.69       75.10
+     Personal Non-Professional Services |     28,508        8.23       83.33
+         Personal Professional Services |      1,442        0.42       83.74
+            Pharmaceutical Manufacturer |      1,061        0.31       84.05
+            Plantation Crop Cultivation |        237        0.07       84.12
+Poultry Farming, Animal Husbandry and.. |      4,809        1.39       85.50
+         Public Administrative Services |      3,636        1.05       86.55
+             Real Estate & Construction |      8,389        2.42       88.98
+                           Retail Trade |     19,869        5.74       94.71
+Soaps, Detergents, Cosmetics, Toiletr.. |        275        0.08       94.79
+                     Textile Industries |      5,508        1.59       96.38
+                     Travel and Tourism |     10,224        2.95       99.33
+                              Utilities |      1,052        0.30       99.64
+                        Wholesale Trade |      1,259        0.36      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    346,407      100.00
+Current State is Assam
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |         54        0.11        0.11
+Automobiles and Other Transport Equip.. |        213        0.42        0.52
+Cement, Tiles, Bricks, Ceramics, Glas.. |         74        0.15        0.67
+                    Chemical Industries |         38        0.07        0.74
+          Communication, Post & Courier |        238        0.47        1.21
+                       Crop Cultivation |      1,618        3.17        4.38
+                       Defence Services |        140        0.27        4.65
+                              Education |      1,456        2.85        7.51
+               Entertainment and Sports |         56        0.11        7.62
+                     Financial Services |        658        1.29        8.91
+                                Fishing |          9        0.02        8.93
+                        Food Industries |        618        1.21       10.14
+  Footwear and other Leather Industries |         19        0.04       10.17
+        Forestry including Wood Cutting |          1        0.00       10.18
+           Fruits and Vegetable Farming |         18        0.04       10.21
+                       Gems & Jewellery |         49        0.10       10.31
+                  Handicraft Industries |         11        0.02       10.33
+                            Health Care |        570        1.12       11.45
+                 Hotels and Restaurants |        437        0.86       12.30
+                              IT & ITES |         42        0.08       12.39
+                Machinery Manufacturers |         57        0.11       12.50
+                   Media and Publishing |        225        0.44       12.94
+                       Metal Industries |         68        0.13       13.07
+                                  Mines |         48        0.09       13.17
+                         Not Applicable |     29,312       57.45       70.62
+     Personal Non-Professional Services |      2,226        4.36       74.98
+         Personal Professional Services |        381        0.75       75.73
+            Pharmaceutical Manufacturer |         91        0.18       75.90
+            Plantation Crop Cultivation |         15        0.03       75.93
+Poultry Farming, Animal Husbandry and.. |         28        0.05       75.99
+         Public Administrative Services |        929        1.82       77.81
+             Real Estate & Construction |      3,134        6.14       83.95
+                           Retail Trade |      5,619       11.01       94.96
+Soaps, Detergents, Cosmetics, Toiletr.. |         41        0.08       95.05
+                     Textile Industries |        159        0.31       95.36
+                     Travel and Tourism |      1,510        2.96       98.32
+                              Utilities |        263        0.52       98.83
+                        Wholesale Trade |        596        1.17      100.00
+----------------------------------------+-----------------------------------
+                                  Total |     51,021      100.00
+
+. 
+. 
+. save temp_data_Feb2ninght,replace
+(note: file temp_data_Feb2ninght.dta not found)
+file temp_data_Feb2ninght.dta saved
+
+. log close
+      name:  <unnamed>
+       log:  /storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl
+  log type:  smcl
+ closed on:   2 Feb 2022, 02:55:20
+-------------------------------------------------------------------------------
+
+. 
+. * event study variable construction
+. use temp_data_Feb2ninght,replace
+
+. gen 
+=exp required
+r(100);
+
+end of do-file
+r(100);

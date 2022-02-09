@@ -4,7 +4,7 @@ set more off
 cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
 
 
-log using "/storage/work/f/fxl146/Pyramids/scale_down_record_firstbatch.smcl", replace
+log using "/storage/work/f/fxl146/Pyramids/scale_down_record_batch_correctincome_year.smcl", replace
 
 
 timer clear
