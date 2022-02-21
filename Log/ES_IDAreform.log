@@ -1,0 +1,3654 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do ES_IDAreform.do 
+
+. *** Event study Industrial Dispute Act labor reform on various outcomes
+. 
+. clear
+
+. set more off
+
+. 
+. capture log close
+
+. log using "/storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl", replace
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl
+  log type:  smcl
+ opened on:   9 Feb 2022, 02:50:16
+
+. 
+. 
+. * identifiers
+. // i : individual (a hh_id-mem-id)
+. // t : period (a month slot in the base dataset)
+. // s : state i lives in 
+. // d : district i lives in 
+. // hr: homogenous region i lives in 
+. 
+. * caveat
+. // Aspirational India and consumption data have not incorporated in. They are
+>  at the household levels. 
+. 
+. // note that people of india has every possible month because some households
+>  are asked in different month in a wave.
+. 
+. 
+. *****************************************************************************
+> ***
+. *********** Sample selection **** 
+. *****************************************************************************
+> ***
+. 
+. 
+. * Sample from people of India (see clean_trim_merge_append.do)
+. clear
+
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. use concise_1419_labor,replace
+
+. 
+. * Drop the obs of two ambigous states, AP and Jharkhand&
+. drop if state == "Andhra Pradesh" | state == "Jharkhand"  // around 6%
+(1,964,705 observations deleted)
+
+. 
+. * disaggregation level (income is at id-monthslot-month level)
+. duplicates report id month_slot month
+
+Duplicates in terms of id month_slot month
+
+--------------------------------------
+   copies | observations       surplus
+----------+---------------------------
+        1 |     30437641             0
+--------------------------------------
+
+. duplicates report id month_slot 
+
+Duplicates in terms of id month_slot
+
+--------------------------------------
+   copies | observations       surplus
+----------+---------------------------
+        1 |       163058             0
+        2 |       482954        241477
+        3 |      1037073        691382
+        4 |     28754556      21565917
+--------------------------------------
+
+. 
+. 
+. * reformat dates
+. gen date=date(month_slot, "MY")
+
+. format date %d
+
+. gen date_m = month(date)
+
+. gen date_y = year(date)
+
+. tostring date_m date_y, replace
+date_m was float now str2
+date_y was float now str4
+
+. replace date_m = "0"+date_m if strlen(date_m)==1
+(22,756,455 real changes made)
+
+. gen date_str = date_y + date_m
+
+. 
+. destring date_m date_y,replace
+date_m: all characters numeric; replaced as byte
+date_y: all characters numeric; replaced as int
+
+. rename month month_of_income_data
+
+. 
+. * Drop extra dates
+. drop if date_y>2019
+(1,034,736 observations deleted)
+
+. 
+. * Now, use the mean income to match people of india time label
+. rename income_of_member_from_* inc_*
+
+. foreach var in inc_all_source inc_wages inc_pension inc_dividend inc_interest
+>  inc_fd_pf_insu{
+  2.         bysort id date: egen mean_`var' = mean(`var')
+  3. }
+(1,094,346 missing values generated)
+(1,094,346 missing values generated)
+(1,094,346 missing values generated)
+(15,848,309 missing values generated)
+
+. duplicates report id date
+
+Duplicates in terms of id date
+
+--------------------------------------
+   copies | observations       surplus
+----------+---------------------------
+        1 |       119868             0
+        2 |       314540        157270
+        3 |       679317        452878
+        4 |     28289180      21216885
+--------------------------------------
+
+. bysort id date: keep if _n==1
+(21,827,033 observations deleted)
+
+. 
+. 
+. * Drop students, and retired observation
+. **** CAVEAT: this needs more careful treatment in the future because status o
+> f student, homemaker and retired observation is a dynamic ones.
+. **** in this version, I drop ever-students and ever-retired
+. gen temp_student = 1 if nature_of_occupation=="Student"
+(6,303,652 missing values generated)
+
+. bysort id (date_y date_m): egen temp_ever_student = sum(temp_student)
+
+. gen temp_retired = 1 if nature_of_occupation=="Retired/Aged"
+(7,100,304 missing values generated)
+
+. bysort id (date_y date_m): egen temp_ever_retired = sum(temp_retired)
+
+. drop if temp_ever_retired>0 | temp_ever_student>0
+(3,000,329 observations deleted)
+
+. drop temp_ever_retired temp_ever_student temp_student temp_retired
+
+. // I don't drop home maker
+. 
+. * regenerate some id (after having done all the sample selection)
+. egen id_date = group(date_str)
+
+. egen id_state = group(state)
+
+. egen id_hr = group(hr)
+
+. egen id_dist= group(district)
+
+. 
+. * organize data
+. sort id hh_id mem_id date_y date_m id_date month_of_income
+
+. order id hh_id mem_id date_y date_m id_date month_of_income
+
+. 
+. 
+. *****************************************************************************
+> ***
+. ***********  Variable construction
+. *****************************************************************************
+> ***
+. 
+. 
+. * first observation of an individual
+. bysort id (id_date): gen period = _n
+
+. 
+. * rename nature and industry
+. 
+. // occupation
+. rename nature_of_occupation nature
+
+. qui tab nature, generate(nature_)
+
+. rename nature_2 nature_business
+
+. rename nature_5 nature_industrialw
+
+. rename nature_10 nature_qualified
+
+. rename nature_12 nature_self
+
+. rename nature_14 nature_small
+
+. rename nature_17 nature_unoccupied
+
+. rename nature_18 nature_wage
+
+. 
+. // industry
+. rename industry_of_occupation inds
+
+. qui tab inds, generate(inds)
+
+. 
+. // not applicable
+. rename inds25 inds_notapplicable
+
+. 
+. ///////// check missing !! do this later!!!!
+> 
+. // factories
+. rename inds2 inds_auto
+
+. rename inds3 inds_construction
+
+. rename inds4 inds_chemical
+
+. rename inds12 inds_foodinds
+
+. rename inds13 inds_leather
+
+. rename inds21 inds_machinery
+
+. rename inds28 inds_pharma
+
+. rename inds34 inds_soap
+
+. rename inds35 inds_textile
+
+. local inds_factory_type inds_auto inds_construction inds_chemical inds_foodin
+> ds inds_leather inds_machinery inds_pharma inds_soap inds_textile
+
+. egen temp_inds_all_factories = rowtotal(`inds_factory_type')
+
+. gen inds_all_factories = 1 if temp_inds_all_factories>0 & inds_notapplicable~
+> =1
+(4,302,209 missing values generated)
+
+. replace inds_all_factories = 0 if temp_inds_all_factories==0 & inds_notapplic
+> able~=1
+(2,329,210 real changes made)
+
+. drop temp_inds_all_factories
+
+. 
+. // plantation
+. rename inds1 inds_agriculture
+
+. rename inds6 inds_cropcultiv
+
+. rename inds11 inds_fishing
+
+. rename inds14 inds_forestry
+
+. rename inds15 inds_fruitveg
+
+. rename inds29 inds_plantationcrop
+
+. rename inds30 inds_poultry
+
+. local inds_plantation_type inds_agriculture  inds_cropcultiv inds_fishing ind
+> s_forestry inds_fruitveg inds_plantationcrop inds_poultry
+
+. egen temp_inds_all_plantation = rowtotal(`inds_plantation_type')
+
+. gen inds_all_plantation = 1 if temp_inds_all_plantation>0 & inds_notapplicabl
+> e~=1
+(4,116,633 missing values generated)
+
+. replace inds_all_plantation = 0 if temp_inds_all_plantation==0 & inds_notappl
+> icable~=1
+(2,143,634 real changes made)
+
+. drop temp_inds_all_plantation
+
+. 
+. // mining
+. rename inds23 inds_metal
+
+. rename inds24 inds_mines
+
+. rename inds37 inds_utilities
+
+. local inds_mining_type inds_metal inds_mines inds_utilities
+
+. egen temp_inds_all_mining = rowtotal(`inds_mining_type')
+
+. gen inds_all_mining = 1 if temp_inds_all_mining>0 & inds_notapplicable~=1
+(4,497,452 missing values generated)
+
+. replace inds_all_mining = 0 if temp_inds_all_mining==0 & inds_notapplicable~=
+> 1
+(2,524,453 real changes made)
+
+. drop temp_inds_all_mining
+
+. 
+. // left out, to be used later
+. rename inds# inds_#_dropped
+
+. drop *_dropped
+
+. // rename inds5 inds_communication
+. // rename inds7 inds_defence
+. // rename inds8 inds_education
+. // rename inds9 inds_entertainsport
+. // rename inds10 inds_finance
+. // rename inds16 inds_gemjewellery
+. // rename inds17 inds_handicraft
+. // rename inds18 inds_healthcare
+. // rename inds19 inds_hotelresturant
+. // rename inds20 inds_IT
+. // rename inds22 inds_mediapublishing
+. // rename inds26 inds_nonprofession
+. // rename inds27 inds_professional
+. // rename inds31 inds_publicadmin
+. // rename inds32 inds_realestate
+. // rename inds33 inds_retail
+. // rename inds36 inds_traveltourism
+. // rename inds38 inds_wholesale
+. 
+. // relevant industry for the study
+. gen inds_relevant = (inds_all_mining+inds_all_plantation+inds_all_factories)>
+> 0 if inds_notapplicable~=1
+(1,972,999 missing values generated)
+
+. gen inds_notrelevant = 1 - inds_relevant
+(1,972,999 missing values generated)
+
+. 
+. * Treatment status: treated if for i, IDA is informed in s(i) in t 
+. * CAVEAT: STATE OF ORIGIN IS NOT THE STATUS WE WANT
+. gen reformed = 0
+
+. replace reformed = 1 if state == "Maharashtra" & ((date_m >= 11 & date_y == 2
+> 017) | date_y>2017 )
+(198,683 real changes made)
+
+. replace reformed = 1 if state == "Rajasthan" & ( (date_m >= 11 & date_y==2014
+> ) | date_y>2014  )
+(261,548 real changes made)
+
+. replace reformed = 1 if state == "Madhya Pradesh" &  ( (date_m >=11 & date_y=
+> =2017) | date_y>2017 )
+(96,035 real changes made)
+
+. replace reformed = 1 if state == "Haryana" & ( (date_m >=3 & date_y==2016) | 
+> date_y>2016 )
+(95,134 real changes made)
+
+. replace reformed = 1 if state == "Gujarat" &  ( (date_m >=9 & date_y==2020) |
+>  date_y>2020 )
+(0 real changes made)
+
+. replace reformed = 1 if state == "Assam" &  ( (date_m >=9 & date_y==2017) | d
+> ate_y>2017 )
+(15,278 real changes made)
+
+. 
+. * treated states (this is a state level variable)
+. gen state_ever_treated = 1 if inlist(state,"Maharashtra","Rajasthan","Madhya 
+> Pradesh","Haryana","Gujarat","Assam")
+(2,971,540 missing values generated)
+
+. 
+. * Ever-treated status of individual, if changed multiple times -- reflecting 
+> migration
+. bysort id : egen temp_ever_reformed = sum(reformed)
+
+. gen reformed_ever = temp_ever_reformed>0
+
+. drop temp_ever_reformed
+
+. tab reformed_ever if period ==1 
+
+reformed_ev |
+         er |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    387,491       79.24       79.24
+          1 |    101,533       20.76      100.00
+------------+-----------------------------------
+      Total |    489,024      100.00
+
+. 
+. * Change treatment status more than once: e.g. 0,0,1,1,0,0, 1=treated
+. bysort id (id_date): gen temp_last_reformed = reformed[_n-1]
+(489,024 missing values generated)
+
+. gen temp_last_reformed_equal = reformed~=temp_last_reformed  if temp_last_ref
+> ormed~=. // an one marks a change of reform status
+(489,024 missing values generated)
+
+. replace temp_last_reformed_equal=0 if temp_last_reformed_equal==.
+(489,024 real changes made)
+
+. bysort id  : egen temp_reformed_changetwice = sum(temp_last_reformed_equal)
+
+. gen reformed_changetwice = 0 if temp_reformed_changetwice==0 | temp_reformed_
+> changetwice==1
+
+. replace reformed_changetwice = 1 if reformed_changetwice~=0
+(0 real changes made)
+
+. 
+. tab reformed_changetwice
+
+reformed_ch |
+  angetwice |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |  4,575,543      100.00      100.00
+------------+-----------------------------------
+      Total |  4,575,543      100.00
+
+. 
+. * Reformed cross early affected industry (mine, planation,factory)
+. // replace missing for not applicable
+. gen reformedxinds = reformed*inds_relevant
+(1,972,999 missing values generated)
+
+. replace reformedxinds = 0 if reformedxinds==.
+(1,972,999 real changes made)
+
+. gen reformedxinds_f = reformed*inds_all_factories
+(1,972,999 missing values generated)
+
+. replace reformedxinds_f = 0 if reformedxinds_f==.
+(1,972,999 real changes made)
+
+. gen reformedxinds_m = reformed*inds_all_mining
+(1,972,999 missing values generated)
+
+. replace reformedxinds_m = 0 if reformedxinds_m==.
+(1,972,999 real changes made)
+
+. gen reformedxinds_p = reformed*inds_all_plantation
+(1,972,999 missing values generated)
+
+. replace reformedxinds_p = 0 if reformedxinds_p==.
+(1,972,999 real changes made)
+
+. 
+. * reframe the industry tags (there is no possibility of multiple industry)
+. gen inds_reframe = -1  // this almost equals home maker
+
+. replace inds_reframe = 1 if inds_all_factories==1
+(273,334 real changes made)
+
+. replace inds_reframe = 2 if inds_all_mining==1
+(78,091 real changes made)
+
+. replace inds_reframe = 3 if inds_all_plantation==1
+(458,910 real changes made)
+
+. replace inds_reframe = 0 if inds_notrelevant==1
+(1,792,209 real changes made)
+
+. 
+. * District level industry composition 
+. bysort id_dist id_date: egen emp_dist_date_total = count(id)
+
+. foreach type in plantation factories mining {
+  2.         bysort id_dist id_date: egen emp_dist_date_`type' = sum(inds_all_`
+> type')
+  3.         gen share_dist_date_`type' = emp_dist_date_`type'/emp_dist_date_to
+> tal
+  4. }
+
+. 
+. * state level composition 
+. bysort id_state id_date: egen emp_state_date_total = count(id)
+
+. foreach type in plantation factories mining {
+  2.         bysort id_state id_date: egen emp_state_date_`type' = sum(inds_all
+> _`type')
+  3.         gen share_state_date_`type' = emp_state_date_`type'/emp_state_date
+> _total
+  4. }
+
+. 
+. 
+. * District and state level industry employment transition of individuals, pre
+> -post
+. bysort id (id_date) : gen inds_reframe_lag = inds_reframe[_n-1]
+(489,024 missing values generated)
+
+. 
+. 
+. * (best way to show this is state by state by year, because some effects migh
+> t wary overtime)
+. * (group state by treatment and control group)
+. 
+. 
+. save labor_reform_sample_Feb9ninght,replace
+file labor_reform_sample_Feb9ninght.dta saved
+
+. 
+. 
+. **** mind the boundary cases. boundary at the treatment date
+. 
+. *****************************************************************************
+> ***
+. *********** Summary stats: industry distribution and individual dynamics ****
+> **
+. *****************************************************************************
+> ***
+. 
+. * distribution unconditional employment 
+. tab inds
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |      3,372        0.08        0.08
+Automobiles and Other Transport Equip.. |     20,322        0.49        0.57
+Cement, Tiles, Bricks, Ceramics, Glas.. |     48,126        1.15        1.72
+                    Chemical Industries |     20,456        0.49        2.21
+          Communication, Post & Courier |     13,451        0.32        2.53
+                       Crop Cultivation |    400,458        9.58       12.11
+                       Defence Services |      8,570        0.20       12.31
+                              Education |    105,487        2.52       14.83
+               Entertainment and Sports |      3,243        0.08       14.91
+                     Financial Services |     46,743        1.12       16.03
+                                Fishing |      5,039        0.12       16.15
+                        Food Industries |     47,796        1.14       17.29
+  Footwear and other Leather Industries |     11,886        0.28       17.58
+        Forestry including Wood Cutting |        896        0.02       17.60
+           Fruits and Vegetable Farming |     35,392        0.85       18.45
+                       Gems & Jewellery |     11,845        0.28       18.73
+                  Handicraft Industries |      4,959        0.12       18.85
+                            Health Care |     29,004        0.69       19.54
+                 Hotels and Restaurants |     29,190        0.70       20.24
+                              IT & ITES |     15,089        0.36       20.60
+                Machinery Manufacturers |     33,505        0.80       21.40
+                   Media and Publishing |      5,236        0.13       21.53
+                       Metal Industries |     50,004        1.20       22.72
+                                  Mines |     11,528        0.28       23.00
+                         Not Applicable |  1,972,999       47.19       70.19
+     Personal Non-Professional Services |    149,396        3.57       73.76
+         Personal Professional Services |     20,044        0.48       74.24
+            Pharmaceutical Manufacturer |      7,416        0.18       74.42
+            Plantation Crop Cultivation |      3,120        0.07       74.49
+Poultry Farming, Animal Husbandry and.. |     10,633        0.25       74.75
+         Public Administrative Services |     85,213        2.04       76.78
+             Real Estate & Construction |    355,172        8.49       85.28
+                           Retail Trade |    349,904        8.37       93.65
+Soaps, Detergents, Cosmetics, Toiletr.. |      7,190        0.17       93.82
+                     Textile Industries |     76,637        1.83       95.65
+                     Travel and Tourism |    134,953        3.23       98.88
+                              Utilities |     16,559        0.40       99.28
+                        Wholesale Trade |     30,227        0.72      100.00
+----------------------------------------+-----------------------------------
+                                  Total |  4,181,060      100.00
+
+. tab inds_notapplicable
+
+  inds==Not |
+ Applicable |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |  2,208,061       52.81       52.81
+          1 |  1,972,999       47.19      100.00
+------------+-----------------------------------
+      Total |  4,181,060      100.00
+
+. tab inds_notrelevant
+
+inds_notrel |
+      evant |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    810,335       31.14       31.14
+          1 |  1,792,209       68.86      100.00
+------------+-----------------------------------
+      Total |  2,602,544      100.00
+
+. tab inds_all_factories
+
+inds_all_fa |
+    ctories |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |  2,329,210       89.50       89.50
+          1 |    273,334       10.50      100.00
+------------+-----------------------------------
+      Total |  2,602,544      100.00
+
+. tab inds_all_mining
+
+inds_all_mi |
+       ning |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |  2,524,453       97.00       97.00
+          1 |     78,091        3.00      100.00
+------------+-----------------------------------
+      Total |  2,602,544      100.00
+
+. tab inds_all_plantation
+
+inds_all_pl |
+   antation |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |  2,143,634       82.37       82.37
+          1 |    458,910       17.63      100.00
+------------+-----------------------------------
+      Total |  2,602,544      100.00
+
+. 
+. ******** CAVEAT all of these are not weighted --- the actual representative d
+> istribution of India should be more scrutinized. 
+. 
+. 
+. * What are the not applicable's occupation?
+. // after deleting ever-students and ever-retired, 94% of the not applicable a
+> re homemaker
+. tab nature if inds == "Not Applicable"
+
+                   NATURE_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                  Agricultural Labourer |      2,573        0.13        0.13
+                            Businessman |      6,958        0.35        0.48
+                             Home Maker |  1,894,391       96.02       96.50
+                      Home-based Worker |        827        0.04       96.54
+                     Industrial Workers |      4,911        0.25       96.79
+    Legislator/Social Worker/ Activists |         32        0.00       96.79
+                                Manager |        460        0.02       96.81
+                       Organised Farmer |      2,232        0.11       96.93
+             Self employed professional |      3,871        0.20       97.12
+                           Small Farmer |      3,937        0.20       97.32
+Small Trader/Hawker/ Businessman with.. |      2,771        0.14       97.46
+                          Support Staff |      5,936        0.30       97.76
+                             Unoccupied |     18,908        0.96       98.72
+                          Wage Labourer |     17,204        0.87       99.60
+                    White collar worker |      7,988        0.40      100.00
+----------------------------------------+-----------------------------------
+                                  Total |  1,972,999      100.00
+
+. 
+. * roughly industry employment distribution for the treated states
+. tab state inds_reframe if state_ever_treated == 1
+
+                 |                inds_reframe
+           STATE |        -1          0          1          2 |     Total
+-----------------+--------------------------------------------+----------
+           Assam |    15,944     19,952      1,116        317 |    39,012 
+         Gujarat |   119,490    104,827     18,437      6,983 |   287,568 
+         Haryana |    67,024     61,483      7,935      1,789 |   148,605 
+  Madhya Pradesh |   118,973     94,406     15,197      4,597 |   270,539 
+     Maharashtra |   217,493    211,580     31,841      9,322 |   552,262 
+       Rajasthan |   143,878    130,184      8,710      2,275 |   306,017 
+-----------------+--------------------------------------------+----------
+           Total |   682,802    622,432     83,236     25,283 | 1,604,003 
+
+
+                 | inds_refra
+                 |     me
+           STATE |         3 |     Total
+-----------------+-----------+----------
+           Assam |     1,683 |    39,012 
+         Gujarat |    37,831 |   287,568 
+         Haryana |    10,374 |   148,605 
+  Madhya Pradesh |    37,366 |   270,539 
+     Maharashtra |    82,026 |   552,262 
+       Rajasthan |    20,970 |   306,017 
+-----------------+-----------+----------
+           Total |   190,250 | 1,604,003 
+
+. 
+. * Summary stats about the reform
+. codebook reformed
+
+-------------------------------------------------------------------------------
+reformed                                                            (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     3,908,865  0
+                       666,678  1
+
+. tab reformed
+
+   reformed |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |  3,908,865       85.43       85.43
+          1 |    666,678       14.57      100.00
+------------+-----------------------------------
+      Total |  4,575,543      100.00
+
+. tab state reformed  
+
+                 |       reformed
+           STATE |         0          1 |     Total
+-----------------+----------------------+----------
+           Assam |    23,734     15,278 |    39,012 
+           Bihar |   278,235          0 |   278,235 
+      Chandigarh |    11,701          0 |    11,701 
+    Chhattisgarh |   144,763          0 |   144,763 
+           Delhi |    42,902          0 |    42,902 
+             Goa |    34,150          0 |    34,150 
+         Gujarat |   287,568          0 |   287,568 
+         Haryana |    53,471     95,134 |   148,605 
+Himachal Pradesh |    40,871          0 |    40,871 
+ Jammu & Kashmir |    70,797          0 |    70,797 
+       Karnataka |   260,313          0 |   260,313 
+          Kerala |   111,688          0 |   111,688 
+  Madhya Pradesh |   174,504     96,035 |   270,539 
+     Maharashtra |   353,579    198,683 |   552,262 
+       Meghalaya |    13,117          0 |    13,117 
+          Odisha |   181,016          0 |   181,016 
+      Puducherry |    31,220          0 |    31,220 
+          Punjab |   192,244          0 |   192,244 
+       Rajasthan |    44,469    261,548 |   306,017 
+          Sikkim |     3,558          0 |     3,558 
+      Tamil Nadu |   266,244          0 |   266,244 
+       Telangana |   150,369          0 |   150,369 
+         Tripura |    14,680          0 |    14,680 
+   Uttar Pradesh |   708,663          0 |   708,663 
+     Uttarakhand |    53,553          0 |    53,553 
+     West Bengal |   361,456          0 |   361,456 
+-----------------+----------------------+----------
+           Total | 3,908,865    666,678 | 4,575,543 
+
+. tab state reformed if state_ever_treated == 1
+
+                 |       reformed
+           STATE |         0          1 |     Total
+-----------------+----------------------+----------
+           Assam |    23,734     15,278 |    39,012 
+         Gujarat |   287,568          0 |   287,568 
+         Haryana |    53,471     95,134 |   148,605 
+  Madhya Pradesh |   174,504     96,035 |   270,539 
+     Maharashtra |   353,579    198,683 |   552,262 
+       Rajasthan |    44,469    261,548 |   306,017 
+-----------------+----------------------+----------
+           Total |   937,325    666,678 | 1,604,003 
+
+. local list_states_treated Maharashtra Rajasthan "Madhya Pradesh" Haryana Guja
+> rat Assam
+
+. foreach var in `list_states_treated'{
+  2.         disp("*************************")
+  3.         disp("Current State is `var'")
+  4.         disp("*************************")
+  5. tab inds if state =="`var'"
+  6. }
+*************************
+Current State is Maharashtra
+*************************
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        512        0.10        0.10
+Automobiles and Other Transport Equip.. |      3,772        0.74        0.84
+Cement, Tiles, Bricks, Ceramics, Glas.. |      1,715        0.34        1.18
+                    Chemical Industries |      3,937        0.78        1.96
+          Communication, Post & Courier |      1,542        0.30        2.26
+                       Crop Cultivation |     71,815       14.15       16.41
+                       Defence Services |        477        0.09       16.51
+                              Education |     11,735        2.31       18.82
+               Entertainment and Sports |        442        0.09       18.91
+                     Financial Services |     11,933        2.35       21.26
+                                Fishing |        712        0.14       21.40
+                        Food Industries |      4,043        0.80       22.19
+  Footwear and other Leather Industries |        814        0.16       22.35
+        Forestry including Wood Cutting |         62        0.01       22.37
+           Fruits and Vegetable Farming |      8,028        1.58       23.95
+                       Gems & Jewellery |      1,105        0.22       24.17
+                  Handicraft Industries |        309        0.06       24.23
+                            Health Care |      3,770        0.74       24.97
+                 Hotels and Restaurants |      4,945        0.97       25.94
+                              IT & ITES |      2,180        0.43       26.37
+                Machinery Manufacturers |      6,751        1.33       27.70
+                   Media and Publishing |      1,156        0.23       27.93
+                       Metal Industries |      6,240        1.23       29.16
+                                  Mines |        751        0.15       29.31
+                         Not Applicable |    217,493       42.85       72.16
+     Personal Non-Professional Services |     18,985        3.74       75.90
+         Personal Professional Services |      2,403        0.47       76.38
+            Pharmaceutical Manufacturer |      1,878        0.37       76.75
+            Plantation Crop Cultivation |        256        0.05       76.80
+Poultry Farming, Animal Husbandry and.. |        641        0.13       76.92
+         Public Administrative Services |     10,202        2.01       78.94
+             Real Estate & Construction |     35,073        6.91       85.85
+                           Retail Trade |     34,304        6.76       92.61
+Soaps, Detergents, Cosmetics, Toiletr.. |        758        0.15       92.75
+                     Textile Industries |      8,173        1.61       94.37
+                     Travel and Tourism |     22,015        4.34       98.70
+                              Utilities |      2,331        0.46       99.16
+                        Wholesale Trade |      4,252        0.84      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    507,510      100.00
+*************************
+Current State is Rajasthan
+*************************
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        174        0.06        0.06
+Automobiles and Other Transport Equip.. |        517        0.19        0.25
+Cement, Tiles, Bricks, Ceramics, Glas.. |      1,844        0.66        0.91
+                    Chemical Industries |        421        0.15        1.06
+          Communication, Post & Courier |        286        0.10        1.16
+                       Crop Cultivation |     20,011        7.18        8.35
+                       Defence Services |        358        0.13        8.47
+                              Education |     10,537        3.78       12.26
+               Entertainment and Sports |        106        0.04       12.29
+                     Financial Services |      1,937        0.70       12.99
+                                Fishing |         36        0.01       13.00
+                        Food Industries |      1,918        0.69       13.69
+  Footwear and other Leather Industries |        362        0.13       13.82
+        Forestry including Wood Cutting |         55        0.02       13.84
+           Fruits and Vegetable Farming |        578        0.21       14.05
+                       Gems & Jewellery |        845        0.30       14.35
+                  Handicraft Industries |        255        0.09       14.44
+                            Health Care |      1,793        0.64       15.09
+                 Hotels and Restaurants |      1,095        0.39       15.48
+                              IT & ITES |         65        0.02       15.50
+                Machinery Manufacturers |        538        0.19       15.69
+                   Media and Publishing |         89        0.03       15.73
+                       Metal Industries |        483        0.17       15.90
+                                  Mines |        833        0.30       16.20
+                         Not Applicable |    143,878       51.64       67.83
+     Personal Non-Professional Services |      5,174        1.86       69.69
+         Personal Professional Services |      1,280        0.46       70.15
+            Pharmaceutical Manufacturer |         63        0.02       70.17
+            Plantation Crop Cultivation |         26        0.01       70.18
+Poultry Farming, Animal Husbandry and.. |         90        0.03       70.22
+         Public Administrative Services |      4,082        1.46       71.68
+             Real Estate & Construction |     40,239       14.44       86.12
+                           Retail Trade |     28,185       10.12       96.24
+Soaps, Detergents, Cosmetics, Toiletr.. |        317        0.11       96.35
+                     Textile Industries |      2,730        0.98       97.33
+                     Travel and Tourism |      5,081        1.82       99.15
+                              Utilities |        959        0.34       99.50
+                        Wholesale Trade |      1,399        0.50      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    278,639      100.00
+*************************
+Current State is Madhya Pradesh
+*************************
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |         71        0.03        0.03
+Automobiles and Other Transport Equip.. |        515        0.21        0.24
+Cement, Tiles, Bricks, Ceramics, Glas.. |      1,989        0.81        1.05
+                    Chemical Industries |        485        0.20        1.25
+          Communication, Post & Courier |        426        0.17        1.42
+                       Crop Cultivation |     33,778       13.76       15.18
+                       Defence Services |        198        0.08       15.26
+                              Education |      7,109        2.90       18.16
+               Entertainment and Sports |        174        0.07       18.23
+                     Financial Services |      1,885        0.77       19.00
+                                Fishing |         37        0.02       19.02
+                        Food Industries |      4,624        1.88       20.90
+  Footwear and other Leather Industries |        473        0.19       21.09
+        Forestry including Wood Cutting |         90        0.04       21.13
+           Fruits and Vegetable Farming |      3,001        1.22       22.35
+                       Gems & Jewellery |        329        0.13       22.49
+                  Handicraft Industries |        603        0.25       22.73
+                            Health Care |      1,154        0.47       23.20
+                 Hotels and Restaurants |      1,787        0.73       23.93
+                              IT & ITES |        134        0.05       23.98
+                Machinery Manufacturers |      1,688        0.69       24.67
+                   Media and Publishing |        189        0.08       24.75
+                       Metal Industries |        854        0.35       25.10
+                                  Mines |      2,995        1.22       26.32
+                         Not Applicable |    118,973       48.48       74.79
+     Personal Non-Professional Services |     10,568        4.31       79.10
+         Personal Professional Services |      1,086        0.44       79.54
+            Pharmaceutical Manufacturer |        181        0.07       79.62
+            Plantation Crop Cultivation |         87        0.04       79.65
+Poultry Farming, Animal Husbandry and.. |        302        0.12       79.78
+         Public Administrative Services |      3,593        1.46       81.24
+             Real Estate & Construction |     14,606        5.95       87.19
+                           Retail Trade |     19,652        8.01       95.20
+Soaps, Detergents, Cosmetics, Toiletr.. |      1,803        0.73       95.93
+                     Textile Industries |      3,439        1.40       97.33
+                     Travel and Tourism |      4,361        1.78       99.11
+                              Utilities |        748        0.30       99.42
+                        Wholesale Trade |      1,432        0.58      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    245,419      100.00
+*************************
+Current State is Haryana
+*************************
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        128        0.09        0.09
+Automobiles and Other Transport Equip.. |      1,008        0.75        0.84
+Cement, Tiles, Bricks, Ceramics, Glas.. |        577        0.43        1.27
+                    Chemical Industries |        537        0.40        1.67
+          Communication, Post & Courier |        527        0.39        2.06
+                       Crop Cultivation |      9,591        7.11        9.17
+                       Defence Services |        414        0.31        9.47
+                              Education |      4,161        3.08       12.56
+               Entertainment and Sports |         74        0.05       12.61
+                     Financial Services |      1,890        1.40       14.01
+                        Food Industries |      1,157        0.86       14.87
+  Footwear and other Leather Industries |        833        0.62       15.49
+        Forestry including Wood Cutting |         11        0.01       15.50
+           Fruits and Vegetable Farming |        476        0.35       15.85
+                       Gems & Jewellery |         87        0.06       15.91
+                  Handicraft Industries |         23        0.02       15.93
+                            Health Care |        982        0.73       16.66
+                 Hotels and Restaurants |        563        0.42       17.08
+                              IT & ITES |        875        0.65       17.72
+                Machinery Manufacturers |      1,077        0.80       18.52
+                   Media and Publishing |        141        0.10       18.63
+                       Metal Industries |      1,258        0.93       19.56
+                                  Mines |         82        0.06       19.62
+                         Not Applicable |     67,024       49.68       69.30
+     Personal Non-Professional Services |      1,875        1.39       70.69
+         Personal Professional Services |        694        0.51       71.20
+            Pharmaceutical Manufacturer |        170        0.13       71.33
+            Plantation Crop Cultivation |          7        0.01       71.33
+Poultry Farming, Animal Husbandry and.. |        161        0.12       71.45
+         Public Administrative Services |      3,696        2.74       74.19
+             Real Estate & Construction |     10,789        8.00       82.19
+                           Retail Trade |     16,246       12.04       94.23
+Soaps, Detergents, Cosmetics, Toiletr.. |        180        0.13       94.36
+                     Textile Industries |      2,396        1.78       96.14
+                     Travel and Tourism |      2,833        2.10       98.24
+                              Utilities |        449        0.33       98.57
+                        Wholesale Trade |      1,929        1.43      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    134,921      100.00
+*************************
+Current State is Gujarat
+*************************
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |         51        0.02        0.02
+Automobiles and Other Transport Equip.. |      1,027        0.39        0.41
+Cement, Tiles, Bricks, Ceramics, Glas.. |      1,210        0.46        0.87
+                    Chemical Industries |      3,205        1.21        2.08
+          Communication, Post & Courier |        778        0.29        2.37
+                       Crop Cultivation |     30,347       11.48       13.85
+                       Defence Services |        125        0.05       13.90
+                              Education |      2,489        0.94       14.84
+               Entertainment and Sports |        230        0.09       14.93
+                     Financial Services |      1,323        0.50       15.43
+                                Fishing |        122        0.05       15.48
+                        Food Industries |      1,599        0.60       16.08
+  Footwear and other Leather Industries |        169        0.06       16.15
+        Forestry including Wood Cutting |         23        0.01       16.16
+           Fruits and Vegetable Farming |      1,394        0.53       16.68
+                       Gems & Jewellery |      3,625        1.37       18.05
+                  Handicraft Industries |        284        0.11       18.16
+                            Health Care |      1,558        0.59       18.75
+                 Hotels and Restaurants |      1,704        0.64       19.40
+                              IT & ITES |        111        0.04       19.44
+                Machinery Manufacturers |      2,610        0.99       20.43
+                   Media and Publishing |        246        0.09       20.52
+                       Metal Industries |      5,823        2.20       22.72
+                                  Mines |        185        0.07       22.79
+                         Not Applicable |    119,490       45.21       68.00
+     Personal Non-Professional Services |     27,933       10.57       78.57
+         Personal Professional Services |      1,314        0.50       79.07
+            Pharmaceutical Manufacturer |        993        0.38       79.44
+            Plantation Crop Cultivation |        400        0.15       79.59
+Poultry Farming, Animal Husbandry and.. |      5,494        2.08       81.67
+         Public Administrative Services |      3,157        1.19       82.87
+             Real Estate & Construction |      7,760        2.94       85.80
+                           Retail Trade |     17,487        6.62       92.42
+Soaps, Detergents, Cosmetics, Toiletr.. |        226        0.09       92.51
+                     Textile Industries |      7,398        2.80       95.30
+                     Travel and Tourism |     10,545        3.99       99.29
+                              Utilities |        975        0.37       99.66
+                        Wholesale Trade |        889        0.34      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    264,299      100.00
+*************************
+Current State is Assam
+*************************
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |         45        0.13        0.13
+Automobiles and Other Transport Equip.. |        157        0.44        0.57
+Cement, Tiles, Bricks, Ceramics, Glas.. |         61        0.17        0.74
+                    Chemical Industries |         40        0.11        0.85
+          Communication, Post & Courier |        210        0.59        1.45
+                       Crop Cultivation |      1,553        4.37        5.82
+                       Defence Services |        114        0.32        6.14
+                              Education |      1,192        3.36        9.50
+               Entertainment and Sports |         51        0.14        9.64
+                     Financial Services |        584        1.65       11.29
+                                Fishing |          8        0.02       11.31
+                        Food Industries |        544        1.53       12.84
+  Footwear and other Leather Industries |         15        0.04       12.89
+        Forestry including Wood Cutting |          1        0.00       12.89
+           Fruits and Vegetable Farming |         18        0.05       12.94
+                       Gems & Jewellery |         44        0.12       13.06
+                  Handicraft Industries |         10        0.03       13.09
+                            Health Care |        490        1.38       14.47
+                 Hotels and Restaurants |        381        1.07       15.54
+                              IT & ITES |         22        0.06       15.61
+                Machinery Manufacturers |         44        0.12       15.73
+                   Media and Publishing |        217        0.61       16.34
+                       Metal Industries |         59        0.17       16.51
+                                  Mines |         35        0.10       16.61
+                         Not Applicable |     15,944       44.92       61.52
+     Personal Non-Professional Services |      2,064        5.81       67.34
+         Personal Professional Services |        305        0.86       68.20
+            Pharmaceutical Manufacturer |         72        0.20       68.40
+            Plantation Crop Cultivation |         24        0.07       68.47
+Poultry Farming, Animal Husbandry and.. |         34        0.10       68.56
+         Public Administrative Services |        811        2.28       70.85
+             Real Estate & Construction |      2,935        8.27       79.11
+                           Retail Trade |      5,040       14.20       93.31
+Soaps, Detergents, Cosmetics, Toiletr.. |         35        0.10       93.41
+                     Textile Industries |        148        0.42       93.83
+                     Travel and Tourism |      1,389        3.91       97.74
+                              Utilities |        223        0.63       98.37
+                        Wholesale Trade |        579        1.63      100.00
+----------------------------------------+-----------------------------------
+                                  Total |     35,498      100.00
+
+. 
+. 
+. ******* Caveat: this needs to be done controlling for occupation: we don't ca
+> re managers in factories's moving around. 
+. 
+. 
+. 
+. * Transition
+. tab inds_reframe_lag inds_reframe if reformed==1, row
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+inds_refra |                      inds_reframe
+    me_lag |        -1          0          1          2          3 |     Total
+-----------+-------------------------------------------------------+----------
+        -1 |   286,904      7,754        912        247      4,033 |   299,850 
+           |     95.68       2.59       0.30       0.08       1.35 |    100.00 
+-----------+-------------------------------------------------------+----------
+         0 |     8,877    200,080      9,563      2,875     10,898 |   232,293 
+           |      3.82      86.13       4.12       1.24       4.69 |    100.00 
+-----------+-------------------------------------------------------+----------
+         1 |       859     10,496     12,654      1,414        756 |    26,179 
+           |      3.28      40.09      48.34       5.40       2.89 |    100.00 
+-----------+-------------------------------------------------------+----------
+         2 |       106      2,790      1,307      3,485        235 |     7,923 
+           |      1.34      35.21      16.50      43.99       2.97 |    100.00 
+-----------+-------------------------------------------------------+----------
+         3 |     4,237      8,976        728        205     63,214 |    77,360 
+           |      5.48      11.60       0.94       0.26      81.71 |    100.00 
+-----------+-------------------------------------------------------+----------
+     Total |   300,983    230,096     25,164      8,226     79,136 |   643,605 
+           |     46.77      35.75       3.91       1.28      12.30 |    100.00 
+
+. tab inds_reframe_lag inds_reframe if reformed==0, row
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+inds_refra |                      inds_reframe
+    me_lag |        -1          0          1          2          3 |     Total
+-----------+-------------------------------------------------------+----------
+        -1 | 1,336,654     63,664     21,059      3,918     27,271 | 1,452,566 
+           |     92.02       4.38       1.45       0.27       1.88 |    100.00 
+-----------+-------------------------------------------------------+----------
+         0 |   207,874  1,011,025     79,900     21,272     58,164 | 1,378,235 
+           |     15.08      73.36       5.80       1.54       4.22 |    100.00 
+-----------+-------------------------------------------------------+----------
+         1 |     9,670     72,329    120,504      8,070      9,343 |   219,916 
+           |      4.40      32.89      54.80       3.67       4.25 |    100.00 
+-----------+-------------------------------------------------------+----------
+         2 |     1,199     18,592      8,459     32,518      1,448 |    62,216 
+           |      1.93      29.88      13.60      52.27       2.33 |    100.00 
+-----------+-------------------------------------------------------+----------
+         3 |    17,556     39,871      7,196      1,160    264,198 |   329,981 
+           |      5.32      12.08       2.18       0.35      80.06 |    100.00 
+-----------+-------------------------------------------------------+----------
+     Total | 1,572,953  1,205,481    237,118     66,938    360,424 | 3,442,914 
+           |     45.69      35.01       6.89       1.94      10.47 |    100.00 
+
+. tab inds_reframe_lag inds_reframe if reformed==1 & state_ever_treated==1, row
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+inds_refra |                      inds_reframe
+    me_lag |        -1          0          1          2          3 |     Total
+-----------+-------------------------------------------------------+----------
+        -1 |   286,904      7,754        912        247      4,033 |   299,850 
+           |     95.68       2.59       0.30       0.08       1.35 |    100.00 
+-----------+-------------------------------------------------------+----------
+         0 |     8,877    200,080      9,563      2,875     10,898 |   232,293 
+           |      3.82      86.13       4.12       1.24       4.69 |    100.00 
+-----------+-------------------------------------------------------+----------
+         1 |       859     10,496     12,654      1,414        756 |    26,179 
+           |      3.28      40.09      48.34       5.40       2.89 |    100.00 
+-----------+-------------------------------------------------------+----------
+         2 |       106      2,790      1,307      3,485        235 |     7,923 
+           |      1.34      35.21      16.50      43.99       2.97 |    100.00 
+-----------+-------------------------------------------------------+----------
+         3 |     4,237      8,976        728        205     63,214 |    77,360 
+           |      5.48      11.60       0.94       0.26      81.71 |    100.00 
+-----------+-------------------------------------------------------+----------
+     Total |   300,983    230,096     25,164      8,226     79,136 |   643,605 
+           |     46.77      35.75       3.91       1.28      12.30 |    100.00 
+
+. tab inds_reframe_lag inds_reframe if reformed==0 & state_ever_treated==1, row
+
++----------------+
+| Key            |
+|----------------|
+|   frequency    |
+| row percentage |
++----------------+
+
+inds_refra |                      inds_reframe
+    me_lag |        -1          0          1          2          3 |     Total
+-----------+-------------------------------------------------------+----------
+        -1 |   263,293     18,448      5,278      1,284     11,494 |   299,797 
+           |     87.82       6.15       1.76       0.43       3.83 |    100.00 
+-----------+-------------------------------------------------------+----------
+         0 |    64,638    215,031     18,401      5,786     15,363 |   319,219 
+           |     20.25      67.36       5.76       1.81       4.81 |    100.00 
+-----------+-------------------------------------------------------+----------
+         1 |     1,964     14,818     26,289      2,090      1,712 |    46,873 
+           |      4.19      31.61      56.09       4.46       3.65 |    100.00 
+-----------+-------------------------------------------------------+----------
+         2 |       367      4,799      2,350      6,481        444 |    14,441 
+           |      2.54      33.23      16.27      44.88       3.07 |    100.00 
+-----------+-------------------------------------------------------+----------
+         3 |     7,307      8,516      1,265        341     72,186 |    89,615 
+           |      8.15       9.50       1.41       0.38      80.55 |    100.00 
+-----------+-------------------------------------------------------+----------
+     Total |   337,569    261,612     53,583     15,982    101,199 |   769,945 
+           |     43.84      33.98       6.96       2.08      13.14 |    100.00 
+
+. 
+. 
+. * Share trend overtime using collapsed-sample
+. 
+. 
+. 
+. * check data range, type, missing
+. codebook 
+
+-------------------------------------------------------------------------------
+id                                                          group(hh_id mem_id)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [2,887886]                   units:  1
+         unique values:  489,024                  missing .:  0/4,575,543
+
+                  mean:    443663
+              std. dev:    256135
+
+           percentiles:        10%       25%       50%       75%       90%
+                             88702    222049    443851    665331    798423
+
+-------------------------------------------------------------------------------
+hh_id                                                                     HH_ID
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [10000111,99998894]          units:  1
+         unique values:  188,924                  missing .:  0/4,575,543
+
+                  mean:   5.1e+07
+              std. dev:   2.7e+07
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.5e+07   2.5e+07   5.0e+07   7.5e+07   9.0e+07
+
+-------------------------------------------------------------------------------
+mem_id                                                                   MEM_ID
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [1,45]                       units:  1
+         unique values:  45                       missing .:  0/4,575,543
+
+                  mean:   2.62844
+              std. dev:   2.37496
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 1         1         2         3         5
+
+-------------------------------------------------------------------------------
+date_y                                                              (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (int)
+
+                 range:  [2014,2019]                  units:  1
+         unique values:  6                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                       770,070  2014
+                       768,948  2015
+                       734,229  2016
+                       722,292  2017
+                       789,067  2018
+                       790,937  2019
+
+-------------------------------------------------------------------------------
+date_m                                                              (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [1,12]                       units:  1
+         unique values:  12                       missing .:  0/4,575,543
+
+                  mean:   6.56786
+              std. dev:   3.40959
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 2         4         7        10        11
+
+-------------------------------------------------------------------------------
+id_date                                                         group(date_str)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,71]                       units:  1
+         unique values:  71                       missing .:  0/4,575,543
+
+                  mean:   35.7682
+              std. dev:   20.9076
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 7        17        36        54        65
+
+-------------------------------------------------------------------------------
+month_of_income_data                                                      MONTH
+-------------------------------------------------------------------------------
+
+                  type:  string (str8)
+
+         unique values:  71                       missing "":  0/4,575,543
+
+              examples:  "Dec 2016"
+                         "Jan 2017"
+                         "Mar 2014"
+                         "Nov 2016"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+month_slot                                                           MONTH_SLOT
+-------------------------------------------------------------------------------
+
+                  type:  string (str8)
+
+         unique values:  71                       missing "":  0/4,575,543
+
+              examples:  "Dec 2015"
+                         "Jan 2019"
+                         "Mar 2015"
+                         "Nov 2017"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+gender                                                                   GENDER
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str1
+
+         unique values:  2                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     2,329,367  "F"
+                     2,246,176  "M"
+
+-------------------------------------------------------------------------------
+age_yrs                                                                 AGE_YRS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (int)
+
+                 range:  [15,106]                     units:  1
+         unique values:  91                       missing .:  0/4,575,543
+
+                  mean:    39.278
+              std. dev:   10.7506
+
+           percentiles:        10%       25%       50%       75%       90%
+                                25        31        39        47        54
+
+-------------------------------------------------------------------------------
+age_mths                                                               AGE_MTHS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,11]                       units:  1
+         unique values:  12                       missing .:  0/4,575,543
+
+                  mean:   .704981
+              std. dev:   2.02728
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         4
+
+-------------------------------------------------------------------------------
+relation_with_hoh                                             RELATION_WITH_HOH
+-------------------------------------------------------------------------------
+
+                  type:  string (str43)
+
+         unique values:  20                       missing "":  0/4,575,543
+
+              examples:  "HOH"
+                         "HOH"
+                         "Son"
+                         "Spouse"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+state_of_origin                                                 STATE_OF_ORIGIN
+-------------------------------------------------------------------------------
+
+                  type:  string (str25), but longest is str17
+
+         unique values:  35                       missing "":  0/4,575,543
+
+              examples:  "Gujarat"
+                         "Madhya Pradesh"
+                         "Punjab"
+                         "Uttar Pradesh"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+religion                                                               RELIGION
+-------------------------------------------------------------------------------
+
+                  type:  string (str19)
+
+         unique values:  10                       missing "":  0/4,575,543
+
+              examples:  "Hindu"
+                         "Hindu"
+                         "Hindu"
+                         "Hindu"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+caste                                                                     CASTE
+-------------------------------------------------------------------------------
+
+                  type:  string (str95)
+
+         unique values:  414                      missing "":  0/4,575,543
+
+              examples:  "Caste not stated"
+                         "Kokna"
+                         "Other OBC"
+                         "Rajputs"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+caste_category                                                   CASTE_CATEGORY
+-------------------------------------------------------------------------------
+
+                  type:  string (str18)
+
+         unique values:  7                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                       428,121  "Intermediate Caste"
+                            50  "Not Applicable"
+                        88,348  "Not Stated"
+                     1,713,920  "OBC"
+                       971,201  "SC"
+                       239,959  "ST"
+                     1,133,944  "Upper Caste"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+literacy                                                               LITERACY
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str1
+
+         unique values:  2                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                       542,171  "N"
+                     4,033,372  "Y"
+
+-------------------------------------------------------------------------------
+education                                                             EDUCATION
+-------------------------------------------------------------------------------
+
+                  type:  string (str28)
+
+         unique values:  17                       missing "":  0/4,575,543
+
+              examples:  "12th Std. Pass"
+                         "5th Std. Pass"
+                         "8th Std. Pass"
+                         "Graduate"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+discipline                                                           DISCIPLINE
+-------------------------------------------------------------------------------
+
+                  type:  string (str60)
+
+         unique values:  30                       missing "":  394,483/4,575,54
+> 3
+
+              examples:  "Arts"
+                         "Not Applicable"
+                         "Not Applicable"
+                         "Not Applicable"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+nature                                                     NATURE_OF_OCCUPATION
+-------------------------------------------------------------------------------
+
+                  type:  string (str55)
+
+         unique values:  20                       missing "":  0/4,575,543
+
+              examples:  "Home Maker"
+                         "Home Maker"
+                         "Organised Farmer"
+                         "Support Staff"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+inds                                                     INDUSTRY_OF_OCCUPATION
+-------------------------------------------------------------------------------
+
+                  type:  string (str71)
+
+         unique values:  38                       missing "":  394,483/4,575,54
+> 3
+
+              examples:  "Education"
+                         "Not Applicable"
+                         "Not Applicable"
+                         "Real Estate & Construction"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+inc_all_source                                INCOME_OF_MEMBER_FROM_ALL_SOURCES
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [0,2250000]                  units:  1
+         unique values:  6,882                    missing .:  0/4,575,543
+
+                  mean:   5634.21
+              std. dev:   9983.34
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0      8000     15000
+
+-------------------------------------------------------------------------------
+inc_wages                                           INCOME_OF_MEMBER_FROM_WAGES
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [0,2250000]                  units:  1
+         unique values:  5,449                    missing .:  0/4,575,543
+
+                  mean:   5610.55
+              std. dev:   9938.28
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0      8000     15000
+
+-------------------------------------------------------------------------------
+inc_pension                                       INCOME_OF_MEMBER_FROM_PENSION
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [0,100000]                   units:  1
+         unique values:  284                      missing .:  394,483/4,575,543
+
+                  mean:   14.7167
+              std. dev:   440.351
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+inc_dividend                                     INCOME_OF_MEMBER_FROM_DIVIDEND
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [0,300000]                   units:  1
+         unique values:  108                      missing .:  394,483/4,575,543
+
+                  mean:   1.34941
+              std. dev:   270.624
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+inc_interest                                     INCOME_OF_MEMBER_FROM_INTEREST
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [0,300000]                   units:  1
+         unique values:  342                      missing .:  394,483/4,575,543
+
+                  mean:   3.49528
+              std. dev:   246.998
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+family_shifted                                                   FAMILY_SHIFTED
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str1
+
+         unique values:  2                        missing "":  1,688,157/4,575,
+> 543
+
+            tabulation:  Freq.  Value
+                     1,688,157  ""
+                     2,873,869  "N"
+                        13,517  "Y"
+
+-------------------------------------------------------------------------------
+inc_fd_pf_insu                            INCOME_OF_MEMBER_FROM_FD_PF_INSURANCE
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [0,450000]                   units:  1
+         unique values:  132                      missing .:  2,662,679/4,575,5
+> 43
+
+                  mean:   13.8292
+              std. dev:   1073.82
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+occupation                                                           OCCUPATION
+-------------------------------------------------------------------------------
+
+                  type:  string (strL)
+
+         unique values:  218                      missing "":  2,899,382/4,575,
+> 543
+
+              examples:  ""
+                         ""
+                         ""
+                         "Home Makers"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+reason_for_emigration_immigratio              REASON_FOR_EMIGRATION_IMMIGRATION
+-------------------------------------------------------------------------------
+
+                  type:  string (str47), but longest is str14
+
+         unique values:  1                        missing "":  3,155,177/4,575,
+> 543
+
+            tabulation:  Freq.  Value
+                     3,155,177  ""
+                     1,420,366  "Not Applicable"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+marital_status                                                   MARITAL_STATUS
+-------------------------------------------------------------------------------
+
+                  type:  string (str18)
+
+         unique values:  5                        missing "":  3,684,540/4,575,
+> 543
+
+            tabulation:  Freq.  Value
+                     3,684,540  ""
+                         2,843  "Divorced/Separated"
+                       698,607  "Married"
+                       100,066  "Not Applicable"
+                        61,322  "Unmarried"
+                        28,165  "Widowed"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+wave_no                                                                 WAVE_NO
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [1,18]                       units:  1
+         unique values:  18                       missing .:  0/4,575,543
+
+                  mean:   9.55591
+              std. dev:   5.23064
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 2         5        10        14        17
+
+-------------------------------------------------------------------------------
+state                                                                     STATE
+-------------------------------------------------------------------------------
+
+                  type:  string (str16)
+
+         unique values:  26                       missing "":  0/4,575,543
+
+              examples:  "Haryana"
+                         "Maharashtra"
+                         "Rajasthan"
+                         "Uttar Pradesh"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+hr                                                                           HR
+-------------------------------------------------------------------------------
+
+                  type:  string (str6)
+
+         unique values:  95                       missing "":  0/4,575,543
+
+              examples:  "HR 22"
+                         "HR 40"
+                         "HR 58"
+                         "HR 8"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+district                                                               DISTRICT
+-------------------------------------------------------------------------------
+
+                  type:  string (str39)
+
+         unique values:  484                      missing "":  0/4,575,543
+
+              examples:  "Chikkaballapura"
+                         "Jalandhar"
+                         "Moradabad"
+                         "Rohtak"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+region_type                                                         REGION_TYPE
+-------------------------------------------------------------------------------
+
+                  type:  string (str5)
+
+         unique values:  2                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     1,578,335  "RURAL"
+                     2,997,208  "URBAN"
+
+-------------------------------------------------------------------------------
+stratum                                                                 STRATUM
+-------------------------------------------------------------------------------
+
+                  type:  string (str15)
+
+         unique values:  353                      missing "":  0/4,575,543
+
+              examples:  "HR 23_RURAL_R"
+                         "HR 40_URBAN_S"
+                         "HR 59_URBAN_S"
+                         "HR 81_RURAL_R"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+psu_id                                                                   PSU_ID
+-------------------------------------------------------------------------------
+
+                  type:  string (str12)
+
+         unique values:  4,164                    missing "":  0/4,575,543
+
+              examples:  "PSU_ID_1329"
+                         "PSU_ID_2761"
+                         "PSU_ID_5608"
+                         "PSU_ID_8105"
+
+-------------------------------------------------------------------------------
+response_status                                                 RESPONSE_STATUS
+-------------------------------------------------------------------------------
+
+                  type:  string (str12), but longest is str8
+
+         unique values:  1                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,575,543  "Accepted"
+
+-------------------------------------------------------------------------------
+reason_for_non_response                                 REASON_FOR_NON_RESPONSE
+-------------------------------------------------------------------------------
+
+                  type:  string (str21), but longest is str10
+
+         unique values:  1                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,575,543  "No Failure"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+mem_weight_w                                                       MEM_WEIGHT_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [81.08168,14612.216]         units:  1.000e-06
+         unique values:  6,201                    missing .:  0/4,575,543
+
+                  mean:   1961.15
+              std. dev:   1995.16
+
+           percentiles:        10%       25%       50%       75%       90%
+                           304.864   552.355   1059.64    2983.9   4892.27
+
+-------------------------------------------------------------------------------
+mem_weight_for_country_w                               MEM_WEIGHT_FOR_COUNTRY_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [81.08168,14612.216]         units:  1.000e-06
+         unique values:  6,201                    missing .:  0/4,575,543
+
+                  mean:    2010.3
+              std. dev:   2033.01
+
+           percentiles:        10%       25%       50%       75%       90%
+                           313.607    574.69   1092.41   3010.81   5017.55
+
+-------------------------------------------------------------------------------
+mem_weight_for_state_w                                   MEM_WEIGHT_FOR_STATE_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [81.08168,14612.216]         units:  1.000e-06
+         unique values:  6,201                    missing .:  0/4,575,543
+
+                  mean:   1981.16
+              std. dev:   1996.74
+
+           percentiles:        10%       25%       50%       75%       90%
+                           310.079   567.364   1080.35   3039.24   4892.27
+
+-------------------------------------------------------------------------------
+ge15_mem_weight_w                                             GE15_MEM_WEIGHT_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [75.716187,13499.461]        units:  1.000e-06
+         unique values:  6,201                    missing .:  0/4,575,543
+
+                  mean:   1813.97
+              std. dev:   1818.22
+
+           percentiles:        10%       25%       50%       75%       90%
+                           286.647   522.756   988.288   2768.82   4435.12
+
+-------------------------------------------------------------------------------
+ge15_mem_weight_for_country_w                     GE15_MEM_WEIGHT_FOR_COUNTRY_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [75.716187,13499.461]        units:  1.000e-06
+         unique values:  6,201                    missing .:  0/4,575,543
+
+                  mean:   1859.18
+              std. dev:   1852.98
+
+           percentiles:        10%       25%       50%       75%       90%
+                           291.209   540.318   1029.14   2803.18   4595.39
+
+-------------------------------------------------------------------------------
+ge15_mem_weight_for_state_w                         GE15_MEM_WEIGHT_FOR_STATE_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [75.716187,13499.461]        units:  1.000e-06
+         unique values:  6,201                    missing .:  0/4,575,543
+
+                  mean:   1832.37
+              std. dev:   1819.67
+
+           percentiles:        10%       25%       50%       75%       90%
+                           289.589   534.851   1014.36   2815.95   4435.12
+
+-------------------------------------------------------------------------------
+mem_non_response_w                                           MEM_NON_RESPONSE_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,301.79999]                units:  1.000e-06
+         unique values:  6,045                    missing .:  0/4,575,543
+
+                  mean:   1.18654
+              std. dev:   .328043
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.03469   1.07317   1.14217   1.24409   1.37318
+
+-------------------------------------------------------------------------------
+mem_non_response_for_country_w                   MEM_NON_RESPONSE_FOR_COUNTRY_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,301.79999]                units:  1.000e-06
+         unique values:  6,045                    missing .:  0/4,575,543
+
+                  mean:   1.18715
+              std. dev:   .355065
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.03469   1.07334   1.14217   1.24415   1.37342
+
+-------------------------------------------------------------------------------
+mem_non_response_for_state_w                       MEM_NON_RESPONSE_FOR_STATE_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,301.79999]                units:  1.000e-06
+         unique values:  6,045                    missing .:  0/4,575,543
+
+                  mean:   1.18714
+              std. dev:   .355025
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.03469   1.07317   1.14217   1.24415   1.37351
+
+-------------------------------------------------------------------------------
+ge15_mem_non_response_w                                 GE15_MEM_NON_RESPONSE_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,260.60001]                units:  1.000e-06
+         unique values:  6,015                    missing .:  0/4,575,543
+
+                  mean:   1.18342
+              std. dev:   .308364
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.03367   1.07272   1.14039   1.24117   1.36557
+
+-------------------------------------------------------------------------------
+ge15_mem_non_response_for_countr            GE15_MEM_NON_RESPONSE_FOR_COUNTRY_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,260.60001]                units:  1.000e-06
+         unique values:  6,015                    missing .:  0/4,575,543
+
+                  mean:     1.184
+              std. dev:    .33308
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.03367   1.07275   1.14041   1.24117    1.3664
+
+-------------------------------------------------------------------------------
+ge15_mem_non_response_for_state_              GE15_MEM_NON_RESPONSE_FOR_STATE_W
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,260.60001]                units:  1.000e-06
+         unique values:  6,015                    missing .:  0/4,575,543
+
+                  mean:     1.184
+              std. dev:   .333056
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.03367   1.07272   1.14039   1.24117   1.36648
+
+-------------------------------------------------------------------------------
+member_status                                                     MEMBER_STATUS
+-------------------------------------------------------------------------------
+
+                  type:  string (str27), but longest is str23
+
+         unique values:  1                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,575,543  "Member of the household"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+is_healthy                                                           IS_HEALTHY
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str1
+
+         unique values:  2                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                        92,439  "N"
+                     4,483,104  "Y"
+
+-------------------------------------------------------------------------------
+is_on_regular_medication                               IS_ON_REGULAR_MEDICATION
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str1
+
+         unique values:  2                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,422,052  "N"
+                       153,491  "Y"
+
+-------------------------------------------------------------------------------
+is_hospitalised                                                 IS_HOSPITALISED
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str1
+
+         unique values:  2                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,572,230  "N"
+                         3,313  "Y"
+
+-------------------------------------------------------------------------------
+has_bank_ac                                                         HAS_BANK_AC
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str2
+
+         unique values:  3                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                            59  "DK"
+                       691,619  "N"
+                     3,883,865  "Y"
+
+-------------------------------------------------------------------------------
+has_creditcard                                                   HAS_CREDITCARD
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str14
+
+         unique values:  4                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                           230  "DK"
+                     4,433,897  "N"
+                        22,625  "Not Applicable"
+                       118,791  "Y"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+has_kisan_creditcard                                       HAS_KISAN_CREDITCARD
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str14
+
+         unique values:  4                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                           126  "DK"
+                     4,462,676  "N"
+                        22,625  "Not Applicable"
+                        90,116  "Y"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+has_demat_ac                                                       HAS_DEMAT_AC
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str2
+
+         unique values:  3                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                         2,214  "DK"
+                     4,551,399  "N"
+                        21,930  "Y"
+
+-------------------------------------------------------------------------------
+has_pf_ac                                                             HAS_PF_AC
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str2
+
+         unique values:  3                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                           153  "DK"
+                     4,158,706  "N"
+                       416,684  "Y"
+
+-------------------------------------------------------------------------------
+has_lic                                                                 HAS_LIC
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str2
+
+         unique values:  3                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                           248  "DK"
+                     2,715,715  "N"
+                     1,859,580  "Y"
+
+-------------------------------------------------------------------------------
+has_health_insurance                                       HAS_HEALTH_INSURANCE
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str2
+
+         unique values:  3                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                           157  "DK"
+                     4,066,143  "N"
+                       509,243  "Y"
+
+-------------------------------------------------------------------------------
+has_mobile                                                           HAS_MOBILE
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str1
+
+         unique values:  2                        missing "":  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     1,390,680  "N"
+                     3,184,863  "Y"
+
+-------------------------------------------------------------------------------
+employment_status                                             EMPLOYMENT_STATUS
+-------------------------------------------------------------------------------
+
+                  type:  string (str49)
+
+         unique values:  4                        missing "":  1,539,018/4,575,
+> 543
+
+            tabulation:  Freq.  Value
+                     1,539,018  ""
+                     1,628,511  "Employed"
+                     1,340,913  "Unemployed, not willing and not looking
+                                for a job"
+                        32,323  "Unemployed, willing and looking for a
+                                job"
+                        34,778  "Unemployed, willing but not looking for
+                                a job"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+employment_status_since_yrs                         EMPLOYMENT_STATUS_SINCE_YRS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [-100,62]                    units:  1
+         unique values:  64                       missing .:  2,031,780/4,575,5
+> 43
+
+                  mean:   22.2945
+              std. dev:   18.3299
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 5        12        22        32        43
+
+-------------------------------------------------------------------------------
+employment_status_since_mths                       EMPLOYMENT_STATUS_SINCE_MTHS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [-100,12]                    units:  1
+         unique values:  14                       missing .:  2,031,780/4,575,5
+> 43
+
+                  mean:  -87.4344
+              std. dev:   34.0403
+
+           percentiles:        10%       25%       50%       75%       90%
+                              -100      -100      -100      -100         2
+
+-------------------------------------------------------------------------------
+employment_status_since_days                       EMPLOYMENT_STATUS_SINCE_DAYS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [-100,31]                    units:  1
+         unique values:  33                       missing .:  2,031,780/4,575,5
+> 43
+
+                  mean:  -95.4475
+              std. dev:   21.7233
+
+           percentiles:        10%       25%       50%       75%       90%
+                              -100      -100      -100      -100      -100
+
+-------------------------------------------------------------------------------
+type_of_employment                                           TYPE_OF_EMPLOYMENT
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str14
+
+         unique values:  3                        missing "":  2,516,971/4,575,
+> 543
+
+            tabulation:  Freq.  Value
+                     2,516,971  ""
+                     1,092,822  "Full-time"
+                       956,304  "Not Applicable"
+                         9,446  "Part-time"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+employment_arrangement                                   EMPLOYMENT_ARRANGEMENT
+-------------------------------------------------------------------------------
+
+                  type:  string (str32)
+
+         unique values:  5                        missing "":  2,516,971/4,575,
+> 543
+
+            tabulation:  Freq.  Value
+                     2,516,971  ""
+                       293,290  "Daily Wage worker/ Casual labour"
+                       956,304  "Not Applicable"
+                       186,975  "Salaried - Permanent"
+                       129,624  "Salaried - Temporary"
+                       492,379  "Self-employed"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+place_of_work                                                     PLACE_OF_WORK
+-------------------------------------------------------------------------------
+
+                  type:  string (str39)
+
+         unique values:  16                       missing "":  2,516,971/4,575,
+> 543
+
+              examples:  ""
+                         ""
+                         "Government"
+                         "Not Applicable"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+time_to_start_working                                     TIME_TO_START_WORKING
+-------------------------------------------------------------------------------
+
+                  type:  string (str18), but longest is str17
+
+         unique values:  9                        missing "":  2,516,971/4,575,
+> 543
+
+            tabulation:  Freq.  Value
+                     2,516,971  ""
+                         2,671  "12 months"
+                         1,342  "18 months"
+                        31,419  "24 months or more"
+                         2,606  "3 months"
+                         1,115  "6 months"
+                           909  "9 months"
+                       264,970  "Don't Know"
+                       634,668  "Never"
+                     1,118,872  "Not Applicable"
+
+               warning:  variable has embedded blanks
+
+-------------------------------------------------------------------------------
+time_spent_on_work_for_hh_and_me              TIME_SPENT_ON_WORK_FOR_HH_AND_MEM
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,16]                       units:  .1
+         unique values:  33                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   3.86984
+              std. dev:   2.75365
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 1       1.5         3         6         8
+
+-------------------------------------------------------------------------------
+time_spent_on_work_for_employer                 TIME_SPENT_ON_WORK_FOR_EMPLOYER
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [-100,15]                    units:  .1
+         unique values:  31                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:  -42.8351
+              std. dev:   53.9393
+
+           percentiles:        10%       25%       50%       75%       90%
+                              -100      -100         6         8         9
+
+-------------------------------------------------------------------------------
+time_spent_on_work_as_unpaid_tra           TIME_SPENT_ON_WORK_AS_UNPAID_TRAINEE
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,9]                        units:  .1
+         unique values:  15                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   .026671
+              std. dev:   .181823
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+time_spent_on_work_as_unpaid_vol         TIME_SPENT_ON_WORK_AS_UNPAID_VOLUNTEER
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,10]                       units:  .1
+         unique values:  15                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:    .04621
+              std. dev:   .221971
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+time_spent_on_travel                                       TIME_SPENT_ON_TRAVEL
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,9]                        units:  .1
+         unique values:  18                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   .638311
+              std. dev:   .595853
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0        .5         1       1.5
+
+-------------------------------------------------------------------------------
+time_spent_on_learning                                   TIME_SPENT_ON_LEARNING
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,9]                        units:  .1
+         unique values:  19                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   .082318
+              std. dev:   .338142
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+time_spent_on_religious_activiti             TIME_SPENT_ON_RELIGIOUS_ACTIVITIES
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,8]                        units:  .1
+         unique values:  14                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   .631723
+              std. dev:   .521188
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0        .5        .5         1         1
+
+-------------------------------------------------------------------------------
+time_spent_on_outdoor_sports                       TIME_SPENT_ON_OUTDOOR_SPORTS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,6]                        units:  .1
+         unique values:  13                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   .110587
+              std. dev:   .393686
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0        .5
+
+-------------------------------------------------------------------------------
+time_spent_on_hanging_out_or_wit      TIME_SPENT_ON_HANGING_OUT_OR_WITH_FRIENDS
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,9]                        units:  .1
+         unique values:  19                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   1.34399
+              std. dev:   .960709
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         1         1         2       2.5
+
+-------------------------------------------------------------------------------
+time_spent_on_indoor_entertainme             TIME_SPENT_ON_INDOOR_ENTERTAINMENT
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,12]                       units:  .1
+         unique values:  20                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   2.02853
+              std. dev:   1.24973
+
+           percentiles:        10%       25%       50%       75%       90%
+                                .5         1         2         3         4
+
+-------------------------------------------------------------------------------
+time_spent_on_other_activities_f        TIME_SPENT_ON_OTHER_ACTIVITIES_FOR_SELF
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,24]                       units:  .1
+         unique values:  49                       missing .:  4,312,958/4,575,5
+> 43
+
+                  mean:   10.9648
+              std. dev:   2.82814
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 8         9      10.5      12.5        15
+
+-------------------------------------------------------------------------------
+date                                                                (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric daily date (float)
+
+                 range:  [19755,21884]                units:  1
+       or equivalently:  [01feb2014,01dec2019]        units:  days
+         unique values:  71                       missing .:  0/4,575,543
+
+                  mean:   20811.8 = 23dec2016 (+ 19 hours)
+              std. dev:   636.366
+
+           percentiles:        10%       25%       50%       75%       90%
+                             19936     20240     20820     21366     21701
+                         01aug2014 01jun2015 01jan2017 01jul2018 01jun2019
+
+-------------------------------------------------------------------------------
+date_str                                                            (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  string (str6)
+
+         unique values:  71                       missing "":  0/4,575,543
+
+              examples:  "201503"
+                         "201605"
+                         "201708"
+                         "201811"
+
+-------------------------------------------------------------------------------
+mean_inc_all_source                                                 (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,2250000]                  units:  1.000e-07
+         unique values:  22,737                   missing .:  0/4,575,543
+
+                  mean:   5632.45
+              std. dev:   9676.24
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0      8125     15000
+
+-------------------------------------------------------------------------------
+mean_inc_wages                                                      (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,2250000]                  units:  1.000e-07
+         unique values:  17,622                   missing .:  0/4,575,543
+
+                  mean:   5608.59
+              std. dev:   9651.29
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0      8100     15000
+
+-------------------------------------------------------------------------------
+mean_inc_pension                                                    (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,112500]                   units:  .0001
+         unique values:  377                      missing .:  287,841/4,575,543
+
+                  mean:   14.4026
+              std. dev:    437.75
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+mean_inc_dividend                                                   (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,125000]                   units:  .00001
+         unique values:  202                      missing .:  287,841/4,575,543
+
+                  mean:   1.26329
+              std. dev:   174.863
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+mean_inc_interest                                                   (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,75000]                    units:  1.000e-06
+         unique values:  781                      missing .:  287,841/4,575,543
+
+                  mean:    3.2985
+              std. dev:    129.83
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+mean_inc_fd_pf_insu                                                 (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,225000]                   units:  .01
+         unique values:  219                      missing .:  2,573,822/4,575,5
+> 43
+
+                  mean:   13.9177
+              std. dev:   585.389
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         0         0         0
+
+-------------------------------------------------------------------------------
+id_state                                                           group(state)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,26]                       units:  1
+         unique values:  26                       missing .:  0/4,575,543
+
+                  mean:   15.5851
+              std. dev:   7.33982
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 4        11        14        22        24
+
+-------------------------------------------------------------------------------
+id_hr                                                                 group(hr)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,95]                       units:  1
+         unique values:  95                       missing .:  0/4,575,543
+
+                  mean:   49.3409
+              std. dev:   26.6312
+
+           percentiles:        10%       25%       50%       75%       90%
+                                13        26        49        72        85
+
+-------------------------------------------------------------------------------
+id_dist                                                         group(district)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,484]                      units:  1
+         unique values:  484                      missing .:  0/4,575,543
+
+                  mean:   237.768
+              std. dev:   139.231
+
+           percentiles:        10%       25%       50%       75%       90%
+                                43       126       241       352       439
+
+-------------------------------------------------------------------------------
+period                                                              (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,18]                       units:  1
+         unique values:  18                       missing .:  0/4,575,543
+
+                  mean:   6.93183
+              std. dev:    4.5577
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 1         3         6        10        14
+
+-------------------------------------------------------------------------------
+nature_1                                          nature==Agricultural Labourer
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,421,108  0
+                       154,435  1
+
+-------------------------------------------------------------------------------
+nature_business                                             nature==Businessman
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,346,430  0
+                       229,113  1
+
+-------------------------------------------------------------------------------
+nature_3                                                     nature==Home Maker
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     2,503,592  0
+                     2,071,951  1
+
+-------------------------------------------------------------------------------
+nature_4                                              nature==Home-based Worker
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,544,176  0
+                        31,367  1
+
+-------------------------------------------------------------------------------
+nature_industrialw                                   nature==Industrial Workers
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,431,584  0
+                       143,959  1
+
+-------------------------------------------------------------------------------
+nature_6                            nature==Legislator/Social Worker/ Activists
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,573,794  0
+                         1,749  1
+
+-------------------------------------------------------------------------------
+nature_7                                                        nature==Manager
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,565,505  0
+                        10,038  1
+
+-------------------------------------------------------------------------------
+nature_8                              nature==Non-Industrial Technical Employee
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,515,210  0
+                        60,333  1
+
+-------------------------------------------------------------------------------
+nature_9                                               nature==Organised Farmer
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,458,237  0
+                       117,306  1
+
+-------------------------------------------------------------------------------
+nature_qualified                  nature==Qualified Self Employed Professionals
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,561,590  0
+                        13,953  1
+
+-------------------------------------------------------------------------------
+nature_11                                    nature==Self Employed Entrepreneur
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,306,662  0
+                       268,881  1
+
+-------------------------------------------------------------------------------
+nature_self                                  nature==Self employed professional
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,557,360  0
+                        18,183  1
+
+-------------------------------------------------------------------------------
+nature_13                                                  nature==Small Farmer
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,349,551  0
+                       225,992  1
+
+-------------------------------------------------------------------------------
+nature_small    nature==Small Trader/Hawker/ Businessman without Fixed Premises
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,478,900  0
+                        96,643  1
+
+-------------------------------------------------------------------------------
+nature_15                                                 nature==Support Staff
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,332,481  0
+                       243,062  1
+
+-------------------------------------------------------------------------------
+nature_16                                                    nature==Unoccupied
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,555,358  0
+                        20,185  1
+
+-------------------------------------------------------------------------------
+nature_unoccupied                                         nature==Wage Labourer
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     3,992,699  0
+                       582,844  1
+
+-------------------------------------------------------------------------------
+nature_wage                             nature==White Collar Clerical Employees
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,453,316  0
+                       122,227  1
+
+-------------------------------------------------------------------------------
+nature_19                                           nature==White collar worker
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,538,027  0
+                        37,516  1
+
+-------------------------------------------------------------------------------
+nature_20       nature==White-Collar Professional Employees and Other Employees
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,449,737  0
+                       125,806  1
+
+-------------------------------------------------------------------------------
+inds_agriculture                           inds==Agriculture- allied activities
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,177,688  0
+                         3,372  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_auto         inds==Automobiles and Other Transport Equipment Manufacturers
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,160,738  0
+                        20,322  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_construction                      inds==Cement, Tiles, Bricks, Ceramics,
+                                       Glass and other construction materials
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,132,934  0
+                        48,126  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_chemical                                         inds==Chemical Industries
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,160,604  0
+                        20,456  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_cropcultiv                                          inds==Crop Cultivation
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     3,780,602  0
+                       400,458  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_fishing                                                      inds==Fishing
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,176,021  0
+                         5,039  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_foodinds                                             inds==Food Industries
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,133,264  0
+                        47,796  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_leather                        inds==Footwear and other Leather Industries
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,169,174  0
+                        11,886  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_forestry                             inds==Forestry including Wood Cutting
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,180,164  0
+                           896  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_fruitveg                                inds==Fruits and Vegetable Farming
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,145,668  0
+                        35,392  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_machinery                                    inds==Machinery Manufacturers
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,147,555  0
+                        33,505  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_metal                                               inds==Metal Industries
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,131,056  0
+                        50,004  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_mines                                                          inds==Mines
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,169,532  0
+                        11,528  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_notapplicable                                         inds==Not Applicable
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     2,208,061  0
+                     1,972,999  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_pharma                                   inds==Pharmaceutical Manufacturer
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,173,644  0
+                         7,416  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_plantationcrop                           inds==Plantation Crop Cultivation
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,177,940  0
+                         3,120  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_poultry           inds==Poultry Farming, Animal Husbandry and Vermiculture
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,170,427  0
+                        10,633  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_soap                        inds==Soaps, Detergents, Cosmetics, Toiletries
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,173,870  0
+                         7,190  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_textile                                           inds==Textile Industries
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,104,423  0
+                        76,637  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_utilities                                                  inds==Utilities
+-------------------------------------------------------------------------------
+
+                  type:  numeric (byte)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  394,483/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,164,501  0
+                        16,559  1
+                       394,483  .
+
+-------------------------------------------------------------------------------
+inds_all_factories                                                  (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  1,972,999/4,575,5
+> 43
+
+            tabulation:  Freq.  Value
+                     2,329,210  0
+                       273,334  1
+                     1,972,999  .
+
+-------------------------------------------------------------------------------
+inds_all_plantation                                                 (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  1,972,999/4,575,5
+> 43
+
+            tabulation:  Freq.  Value
+                     2,143,634  0
+                       458,910  1
+                     1,972,999  .
+
+-------------------------------------------------------------------------------
+inds_all_mining                                                     (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  1,972,999/4,575,5
+> 43
+
+            tabulation:  Freq.  Value
+                     2,524,453  0
+                        78,091  1
+                     1,972,999  .
+
+-------------------------------------------------------------------------------
+inds_relevant                                                       (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  1,972,999/4,575,5
+> 43
+
+            tabulation:  Freq.  Value
+                     1,792,209  0
+                       810,335  1
+                     1,972,999  .
+
+-------------------------------------------------------------------------------
+inds_notrelevant                                                    (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  1,972,999/4,575,5
+> 43
+
+            tabulation:  Freq.  Value
+                       810,335  0
+                     1,792,209  1
+                     1,972,999  .
+
+-------------------------------------------------------------------------------
+reformed                                                            (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     3,908,865  0
+                       666,678  1
+
+-------------------------------------------------------------------------------
+state_ever_treated                                                  (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,1]                        units:  1
+         unique values:  1                        missing .:  2,971,540/4,575,5
+> 43
+
+            tabulation:  Freq.  Value
+                     1,604,003  1
+                     2,971,540  .
+
+-------------------------------------------------------------------------------
+reformed_ever                                                       (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     3,448,389  0
+                     1,127,154  1
+
+-------------------------------------------------------------------------------
+temp_last_reformed                                                  (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  489,024/4,575,543
+
+            tabulation:  Freq.  Value
+                     3,521,374  0
+                       565,145  1
+                       489,024  .
+
+-------------------------------------------------------------------------------
+temp_last_reformed_equal                                            (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,497,083  0
+                        78,460  1
+
+-------------------------------------------------------------------------------
+temp_reformed_changetwice                                           (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     3,558,122  0
+                     1,017,421  1
+
+-------------------------------------------------------------------------------
+reformed_changetwice                                                (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,0]                        units:  1
+         unique values:  1                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,575,543  0
+
+-------------------------------------------------------------------------------
+reformedxinds                                                       (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,459,539  0
+                       116,004  1
+
+-------------------------------------------------------------------------------
+reformedxinds_f                                                     (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,549,622  0
+                        25,921  1
+
+-------------------------------------------------------------------------------
+reformedxinds_m                                                     (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,567,121  0
+                         8,422  1
+
+-------------------------------------------------------------------------------
+reformedxinds_p                                                     (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     4,493,882  0
+                        81,661  1
+
+-------------------------------------------------------------------------------
+inds_reframe                                                        (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [-1,3]                       units:  1
+         unique values:  5                        missing .:  0/4,575,543
+
+            tabulation:  Freq.  Value
+                     1,972,999  -1
+                     1,792,209  0
+                       273,334  1
+                        78,091  2
+                       458,910  3
+
+-------------------------------------------------------------------------------
+emp_dist_date_total                                                 (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [1,2936]                     units:  1
+         unique values:  1,325                    missing .:  0/4,575,543
+
+                  mean:   666.373
+              std. dev:   356.232
+
+           percentiles:        10%       25%       50%       75%       90%
+                               201       441       650       856      1085
+
+-------------------------------------------------------------------------------
+emp_dist_date_plantation                                            (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,450]                      units:  1
+         unique values:  332                      missing .:  0/4,575,543
+
+                  mean:   55.1846
+              std. dev:    68.897
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         4        32        80       142
+
+-------------------------------------------------------------------------------
+share_dist_date_plantation                                          (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,.92105263]                units:  1.000e-11
+         unique values:  6,805                    missing .:  0/4,575,543
+
+                  mean:   .100296
+              std. dev:   .125763
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0   .007062     .0553   .139896   .275081
+
+-------------------------------------------------------------------------------
+emp_dist_date_factories                                             (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,334]                      units:  1
+         unique values:  240                      missing .:  0/4,575,543
+
+                  mean:   40.0091
+              std. dev:   50.4112
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         3        20        59       111
+
+-------------------------------------------------------------------------------
+share_dist_date_factories                                           (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,.78947371]                units:  1.000e-10
+         unique values:  5,626                    missing .:  0/4,575,543
+
+                  mean:   .059738
+              std. dev:   .069179
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0   .006886   .036624   .090361   .148241
+
+-------------------------------------------------------------------------------
+emp_dist_date_mining                                                (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,235]                      units:  1
+         unique values:  155                      missing .:  0/4,575,543
+
+                  mean:   12.3005
+              std. dev:   24.6534
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0         4        13        32
+
+-------------------------------------------------------------------------------
+share_dist_date_mining                                              (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,.34794521]                units:  1.000e-11
+         unique values:  3,823                    missing .:  0/4,575,543
+
+                  mean:   .017067
+              std. dev:   .030693
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0         0   .006494   .019608   .043833
+
+-------------------------------------------------------------------------------
+emp_state_date_total                                                (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [60,12778]                   units:  1
+         unique values:  1,367                    missing .:  0/4,575,543
+
+                  mean:   4894.02
+              std. dev:   2916.95
+
+           percentiles:        10%       25%       50%       75%       90%
+                              1705      2915      4059      7473      9519
+
+-------------------------------------------------------------------------------
+emp_state_date_plantation                                           (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1747]                     units:  1
+         unique values:  646                      missing .:  0/4,575,543
+
+                  mean:   499.239
+              std. dev:     414.7
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0       180       426       722      1186
+
+-------------------------------------------------------------------------------
+share_state_date_plantation                                         (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,.41552106]                units:  1.000e-10
+         unique values:  1,437                    missing .:  0/4,575,543
+
+                  mean:   .100296
+              std. dev:   .062044
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0   .060725    .09943   .141551    .17885
+
+-------------------------------------------------------------------------------
+emp_state_date_factories                                            (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1744]                     units:  1
+         unique values:  494                      missing .:  0/4,575,543
+
+                  mean:   301.487
+              std. dev:   323.306
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0        54       203       471       642
+
+-------------------------------------------------------------------------------
+share_state_date_factories                                          (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,.34824282]                units:  1.000e-10
+         unique values:  1,481                    missing .:  0/4,575,543
+
+                  mean:   .059738
+              std. dev:   .048073
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0   .023463   .053844    .08237   .129088
+
+-------------------------------------------------------------------------------
+emp_state_date_mining                                               (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,513]                      units:  1
+         unique values:  215                      missing .:  0/4,575,543
+
+                  mean:   74.7487
+              std. dev:   69.0495
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0        16        62       118       169
+
+-------------------------------------------------------------------------------
+share_state_date_mining                                             (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,.16206589]                units:  1.000e-11
+         unique values:  1,411                    missing .:  0/4,575,543
+
+                  mean:   .017067
+              std. dev:   .017295
+
+           percentiles:        10%       25%       50%       75%       90%
+                                 0   .006548   .013679   .021886   .037245
+
+-------------------------------------------------------------------------------
+inds_reframe_lag                                                    (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [-1,3]                       units:  1
+         unique values:  5                        missing .:  489,024/4,575,543
+
+            tabulation:  Freq.  Value
+                     1,752,416  -1
+                     1,610,528  0
+                       246,095  1
+                        70,139  2
+                       407,341  3
+                       489,024  .
+
+. 
+. 
+. log close
+      name:  <unnamed>
+       log:  /storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl
+  log type:  smcl
+ closed on:   9 Feb 2022, 04:06:20
+-------------------------------------------------------------------------------
+
+. 
+. 
+. 
+. clear
+
+. 
+. 
+. a
+command a is unrecognized
+r(199);
+
+end of do-file
+r(199);

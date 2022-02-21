@@ -3,17 +3,11 @@ set more off
 capture ssc install fs
 
 
-<<<<<<< HEAD:Carlos_Fri_report/explore_pyramids.do
 * the data used here is editted by prep_explore_pyramids.do
 
 cd "C:\Users\carlo\Dropbox\India_Dev"
 
 use RawData\temp/explore_pyramids_carlos, clear
-=======
-cd /gpfs/scratch/cas788
-
-use explore_pyramids_carlos, clear
->>>>>>> aa876086e980762ef7f3e927a022c9f27175f9cd:explore_pyramids.do
 /*
 *** do a description of income by nature of occupation (do self-employed loose income?)
 preserve
@@ -107,13 +101,10 @@ restore
 /* I don't see a lot of evidence with just this grahs to say that there is a reduction on income of self-employees in general or compared to most groups
  we should probably look inside the industry of occupation, also porbably we can do a regression of income on education, gender, age, health, controlls,and industry-year fixed effects and then do these graphs on the residuals*/
 */
-<<<<<<< HEAD:Carlos_Fri_report/explore_pyramids.do
 
 
-=======
->>>>>>> aa876086e980762ef7f3e927a022c9f27175f9cd:explore_pyramids.do
 *** do a survival analysis of employment arrangement (do self-employed switch out of self-employment more?)
-keep date_m nature id hh_id mem_id industry
+
 gen post=date_m>tm(2017m6)
 forvalues k=0(1)6 {
 	gen event_`k'=date_m==tm(2017m6)+`k'
@@ -148,11 +139,7 @@ rename nature_18 nature_wage
 rename nature_19 nature_whiteclerical
 rename nature_20 nature_whiteprofesional
 
-<<<<<<< HEAD:Carlos_Fri_report/explore_pyramids.do
 rename nature_of_occupation nature 
-=======
-*rename nature_of_occupation nature 
->>>>>>> aa876086e980762ef7f3e927a022c9f27175f9cd:explore_pyramids.do
 
 gen nature_all=nature_business==1|nature_industrialw==1|nature_qualified==1|nature_self==1|nature_small==1
 
@@ -175,7 +162,6 @@ forvalues k=1/6 {
 gen L`xxx'xevent_neg`k'=L.`xx'*event_neg`k' 
 }
 }
-<<<<<<< HEAD:Carlos_Fri_report/explore_pyramids.do
 
 
 foreach xx in business industrialw qualified self small all wage {
@@ -195,26 +181,6 @@ outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons add
 
 /* excluded L.nature_wage Lwagexpost ///
 L.nature_qualified Lqualifiedxpost /// 
-=======
-
-
-foreach xx in business industrialw qualified self small all wage {
-xtset id date_m
-
-reghdfe nature_unoccupied L.nature_`xx' L`xx'xpost, a(hh_id date_m) vce(cl id)
-outreg2 using `xx'_employed_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
-reghdfe nature_unoccupied L.nature_`xx' L`xx'xpost, a(id date_m) vce(cl id)
-outreg2 using `xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
-reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(hh_id date_m) vce(cl id)
-outreg2 using `xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hh date)
-reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(id date_m) vce(cl id)
-outreg2 using `xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
-
-}
-
-
-/* excluded L.nature_wage Lwagexpost ///
- */
 
 xtset id date_m
 reghdfe nature_unoccupied L.nature_agricultural Lagriculturalxpost ///
@@ -227,7 +193,6 @@ L.nature_legislatoretc Llegislatoretcxpost ///
 L.nature_manager Lmanagerxpost ///
 L.nature_nonindtechemp Lnonindtechempxpost ///
 L.nature_orgfarmer Lorgfarmerxpost ///
-L.nature_qualified Lqualifiedxpost ///
 L.nature_retired Lretiredxpost ///
 L.nature_self Lselfxpost ///
 L.nature_smallfarmer Lsmallfarmerxpost ///
@@ -237,87 +202,9 @@ L.nature_suppstaff Lsuppstaffxpost ///
 L.nature_whiteclerical Lwhiteclericalxpost ///
 L.nature_whiteprofesional Lwhiteprofesionalxpost ///
 , a(hh_id date_m) vce(cl id) 
-outreg2 using fullnature_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
-xtset id date_m
-reghdfe nature_unoccupied L.nature_agricultural Lagriculturalxpost ///
-L.nature_business Lbusinessxpost ///
-L.nature_homemaker Lhomemakerxpost ///
-L.nature_homeworker Lhomeworkerxpost ///
-L.nature_industrialw Lindustrialwxpost ///
-L.nature_qualified Lqualifiedxpost ///
-L.nature_legislatoretc Llegislatoretcxpost ///
-L.nature_manager Lmanagerxpost ///
-L.nature_nonindtechemp Lnonindtechempxpost ///
-L.nature_orgfarmer Lorgfarmerxpost ///
-L.nature_qualified Lqualifiedxpost ///
-L.nature_retired Lretiredxpost ///
-L.nature_self Lselfxpost ///
-L.nature_smallfarmer Lsmallfarmerxpost ///
-L.nature_small Lsmallxpost ///
-L.nature_student Lstudentxpost ///
-L.nature_suppstaff Lsuppstaffxpost ///
-L.nature_whiteclerical Lwhiteclericalxpost ///
-L.nature_whiteprofesional Lwhiteprofesionalxpost ///
-, a(hh_id date_m) vce(cl id) 
-outreg2 using fullnature_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
-
-**** 
->>>>>>> aa876086e980762ef7f3e927a022c9f27175f9cd:explore_pyramids.do
-
-xtset id date_m
-reghdfe nature_unoccupied L.nature_agricultural Lagriculturalxpost ///
-L.nature_business Lbusinessxpost ///
-L.nature_homemaker Lhomemakerxpost ///
-L.nature_homeworker Lhomeworkerxpost ///
-L.nature_industrialw Lindustrialwxpost ///
-L.nature_qualified Lqualifiedxpost ///
-L.nature_legislatoretc Llegislatoretcxpost ///
-L.nature_manager Lmanagerxpost ///
-L.nature_nonindtechemp Lnonindtechempxpost ///
-L.nature_orgfarmer Lorgfarmerxpost ///
-<<<<<<< HEAD:Carlos_Fri_report/explore_pyramids.do
-=======
-L.nature_qualified Lqualifiedxpost ///
->>>>>>> aa876086e980762ef7f3e927a022c9f27175f9cd:explore_pyramids.do
-L.nature_retired Lretiredxpost ///
-L.nature_self Lselfxpost ///
-L.nature_smallfarmer Lsmallfarmerxpost ///
-L.nature_small Lsmallxpost ///
-L.nature_student Lstudentxpost ///
-L.nature_suppstaff Lsuppstaffxpost ///
-L.nature_whiteclerical Lwhiteclericalxpost ///
-L.nature_whiteprofesional Lwhiteprofesionalxpost ///
-, a(hh_id date_m) vce(cl id) 
-<<<<<<< HEAD:Carlos_Fri_report/explore_pyramids.do
 outreg2 using Tables/`xx'_employed_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
 reghdfe nature_unoccupied L.nature_`xx' L`xx'xpost, a(id date_m) vce(cl id)
 outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
-=======
-outreg2 using fullnature_to_unoccupied, replace excel dec(5) nocons addtext(FE: hh date)
-xtset id date_m
-reghdfe nature_unoccupied L.nature_agricultural Lagriculturalxpost ///
-L.nature_business Lbusinessxpost ///
-L.nature_homemaker Lhomemakerxpost ///
-L.nature_homeworker Lhomeworkerxpost ///
-L.nature_industrialw Lindustrialwxpost ///
-L.nature_qualified Lqualifiedxpost ///
-L.nature_legislatoretc Llegislatoretcxpost ///
-L.nature_manager Lmanagerxpost ///
-L.nature_nonindtechemp Lnonindtechempxpost ///
-L.nature_orgfarmer Lorgfarmerxpost ///
-L.nature_qualified Lqualifiedxpost ///
-L.nature_retired Lretiredxpost ///
-L.nature_self Lselfxpost ///
-L.nature_smallfarmer Lsmallfarmerxpost ///
-L.nature_small Lsmallxpost ///
-L.nature_student Lstudentxpost ///
-L.nature_suppstaff Lsuppstaffxpost ///
-L.nature_whiteclerical Lwhiteclericalxpost ///
-L.nature_whiteprofesional Lwhiteprofesionalxpost ///
-, a(hh_id date_m) vce(cl id) 
-outreg2 using fullnature_to_unoccupied, append excel dec(5) nocons addtext(FE: hhxmem date)
-
->>>>>>> aa876086e980762ef7f3e927a022c9f27175f9cd:explore_pyramids.do
 reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(hh_id date_m) vce(cl id)
 outreg2 using Tables/`xx'_employed_to_unoccupied, append excel dec(5) nocons addtext(FE: hh date)
 reghdfe nature_unoccupied past_`xx' past_`xx'xpost, a(id date_m) vce(cl id)

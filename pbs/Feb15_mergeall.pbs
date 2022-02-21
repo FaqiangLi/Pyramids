@@ -1,0 +1,78 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -l nodes=1:ppn=20,walltime=48:00:00
+#PBS -l pmem=12gb
+#PBS -N Feb15_mergeall
+#PBS -e Feb15_mergeall_e.txt
+#PBS -o Feb15_mergeall_o.txt
+
+#PBS -j oe
+
+ 
+
+#PBS -A open
+
+ 
+
+#PBS -m abe
+
+ 
+
+#PBS -M fxl146@psu.edu
+
+ 
+
+# Get started
+
+ 
+
+echo " "
+
+ 
+
+echo "JOB started on $(hostname -s) at $(date)"
+
+ 
+
+echo " "
+
+ 
+
+# Load in stata
+
+module purge
+
+module load stata
+
+
+ 
+
+# Set directory
+
+ 
+
+cd '/storage/work/fxl146/Pyramids/'
+
+ 
+
+# Run the job itself
+
+ 
+
+stata -b do clean_trim_merge_append.do 
+
+ 
+
+# Finish up
+
+ 
+
+echo " "
+
+ 
+
+echo "Job ended at $(date)"
+
+ 
+
+echo " "

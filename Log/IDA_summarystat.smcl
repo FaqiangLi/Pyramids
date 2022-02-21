@@ -1,0 +1,3538 @@
+{smcl}
+{com}{sf}{ul off}{txt}{.-}
+      name:  {res}<unnamed>
+       {txt}log:  {res}/storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl
+  {txt}log type:  {res}smcl
+ {txt}opened on:  {res} 9 Feb 2022, 02:50:16
+{txt}
+{com}. 
+. 
+. * identifiers
+. // i : individual (a hh_id-mem-id)
+. // t : period (a month slot in the base dataset)
+. // s : state i lives in 
+. // d : district i lives in 
+. // hr: homogenous region i lives in 
+. 
+. * caveat
+. // Aspirational India and consumption data have not incorporated in. They are at the household levels. 
+. 
+. // note that people of india has every possible month because some households are asked in different month in a wave.
+. 
+. 
+. ********************************************************************************
+. *********** Sample selection **** 
+. ********************************************************************************
+. 
+. 
+. * Sample from people of India (see clean_trim_merge_append.do)
+. clear
+{txt}
+{com}. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+{res}/gpfs/scratch/fxl146/Pyramids_statafiles
+{txt}
+{com}. use concise_1419_labor,replace
+{txt}
+{com}. 
+. * Drop the obs of two ambigous states, AP and Jharkhand&
+. drop if state == "Andhra Pradesh" | state == "Jharkhand"  // around 6%
+{txt}(1,964,705 observations deleted)
+
+{com}. 
+. * disaggregation level (income is at id-monthslot-month level)
+. duplicates report id month_slot month
+
+{p 0 4}{txt}Duplicates in terms of {res} id month_slot month{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}     {res}30437641             0
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. duplicates report id month_slot 
+
+{p 0 4}{txt}Duplicates in terms of {res} id month_slot{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}       {res}163058             0
+        {txt}2 {c |}       {res}482954        241477
+        {txt}3 {c |}      {res}1037073        691382
+        {txt}4 {c |}     {res}28754556      21565917
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. 
+. 
+. * reformat dates
+. gen date=date(month_slot, "MY")
+{txt}
+{com}. format date %d
+{txt}
+{com}. gen date_m = month(date)
+{txt}
+{com}. gen date_y = year(date)
+{txt}
+{com}. tostring date_m date_y, replace
+{txt}date_m was {res:float} now {res:str2}
+date_y was {res:float} now {res:str4}
+
+{com}. replace date_m = "0"+date_m if strlen(date_m)==1
+{txt}(22,756,455 real changes made)
+
+{com}. gen date_str = date_y + date_m
+{txt}
+{com}. 
+. destring date_m date_y,replace
+{txt}date_m: all characters numeric; {res}replaced {txt}as {res}byte
+{txt}date_y: all characters numeric; {res}replaced {txt}as {res}int
+{txt}
+{com}. rename month month_of_income_data
+{res}{txt}
+{com}. 
+. * Drop extra dates
+. drop if date_y>2019
+{txt}(1,034,736 observations deleted)
+
+{com}. 
+. * Now, use the mean income to match people of india time label
+. rename income_of_member_from_* inc_*
+{res}{txt}
+{com}. foreach var in inc_all_source inc_wages inc_pension inc_dividend inc_interest inc_fd_pf_insu{c -(}
+{txt}  2{com}.         bysort id date: egen mean_`var' = mean(`var')
+{txt}  3{com}. {c )-}
+{txt}(1,094,346 missing values generated)
+(1,094,346 missing values generated)
+(1,094,346 missing values generated)
+(15,848,309 missing values generated)
+
+{com}. duplicates report id date
+
+{p 0 4}{txt}Duplicates in terms of {res} id date{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}       {res}119868             0
+        {txt}2 {c |}       {res}314540        157270
+        {txt}3 {c |}       {res}679317        452878
+        {txt}4 {c |}     {res}28289180      21216885
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. bysort id date: keep if _n==1
+{txt}(21,827,033 observations deleted)
+
+{com}. 
+. 
+. * Drop students, and retired observation
+. **** CAVEAT: this needs more careful treatment in the future because status of student, homemaker and retired observation is a dynamic ones.
+. **** in this version, I drop ever-students and ever-retired
+. gen temp_student = 1 if nature_of_occupation=="Student"
+{txt}(6,303,652 missing values generated)
+
+{com}. bysort id (date_y date_m): egen temp_ever_student = sum(temp_student)
+{txt}
+{com}. gen temp_retired = 1 if nature_of_occupation=="Retired/Aged"
+{txt}(7,100,304 missing values generated)
+
+{com}. bysort id (date_y date_m): egen temp_ever_retired = sum(temp_retired)
+{txt}
+{com}. drop if temp_ever_retired>0 | temp_ever_student>0
+{txt}(3,000,329 observations deleted)
+
+{com}. drop temp_ever_retired temp_ever_student temp_student temp_retired
+{txt}
+{com}. // I don't drop home maker
+. 
+. * regenerate some id (after having done all the sample selection)
+. egen id_date = group(date_str)
+{txt}
+{com}. egen id_state = group(state)
+{txt}
+{com}. egen id_hr = group(hr)
+{txt}
+{com}. egen id_dist= group(district)
+{txt}
+{com}. 
+. * organize data
+. sort id hh_id mem_id date_y date_m id_date month_of_income
+{txt}
+{com}. order id hh_id mem_id date_y date_m id_date month_of_income
+{txt}
+{com}. 
+. 
+. ********************************************************************************
+. ***********  Variable construction
+. ********************************************************************************
+. 
+. 
+. * first observation of an individual
+. bysort id (id_date): gen period = _n
+{txt}
+{com}. 
+. * rename nature and industry
+. 
+. // occupation
+. rename nature_of_occupation nature
+{res}{txt}
+{com}. qui tab nature, generate(nature_)
+{txt}
+{com}. rename nature_2 nature_business
+{res}{txt}
+{com}. rename nature_5 nature_industrialw
+{res}{txt}
+{com}. rename nature_10 nature_qualified
+{res}{txt}
+{com}. rename nature_12 nature_self
+{res}{txt}
+{com}. rename nature_14 nature_small
+{res}{txt}
+{com}. rename nature_17 nature_unoccupied
+{res}{txt}
+{com}. rename nature_18 nature_wage
+{res}{txt}
+{com}. 
+. // industry
+. rename industry_of_occupation inds
+{res}{txt}
+{com}. qui tab inds, generate(inds)
+{txt}
+{com}. 
+. // not applicable
+. rename inds25 inds_notapplicable
+{res}{txt}
+{com}. 
+. ///////// check missing !! do this later!!!!
+> 
+. // factories
+. rename inds2 inds_auto
+{res}{txt}
+{com}. rename inds3 inds_construction
+{res}{txt}
+{com}. rename inds4 inds_chemical
+{res}{txt}
+{com}. rename inds12 inds_foodinds
+{res}{txt}
+{com}. rename inds13 inds_leather
+{res}{txt}
+{com}. rename inds21 inds_machinery
+{res}{txt}
+{com}. rename inds28 inds_pharma
+{res}{txt}
+{com}. rename inds34 inds_soap
+{res}{txt}
+{com}. rename inds35 inds_textile
+{res}{txt}
+{com}. local inds_factory_type inds_auto inds_construction inds_chemical inds_foodinds inds_leather inds_machinery inds_pharma inds_soap inds_textile
+{txt}
+{com}. egen temp_inds_all_factories = rowtotal(`inds_factory_type')
+{txt}
+{com}. gen inds_all_factories = 1 if temp_inds_all_factories>0 & inds_notapplicable~=1
+{txt}(4,302,209 missing values generated)
+
+{com}. replace inds_all_factories = 0 if temp_inds_all_factories==0 & inds_notapplicable~=1
+{txt}(2,329,210 real changes made)
+
+{com}. drop temp_inds_all_factories
+{txt}
+{com}. 
+. // plantation
+. rename inds1 inds_agriculture
+{res}{txt}
+{com}. rename inds6 inds_cropcultiv
+{res}{txt}
+{com}. rename inds11 inds_fishing
+{res}{txt}
+{com}. rename inds14 inds_forestry
+{res}{txt}
+{com}. rename inds15 inds_fruitveg
+{res}{txt}
+{com}. rename inds29 inds_plantationcrop
+{res}{txt}
+{com}. rename inds30 inds_poultry
+{res}{txt}
+{com}. local inds_plantation_type inds_agriculture  inds_cropcultiv inds_fishing inds_forestry inds_fruitveg inds_plantationcrop inds_poultry
+{txt}
+{com}. egen temp_inds_all_plantation = rowtotal(`inds_plantation_type')
+{txt}
+{com}. gen inds_all_plantation = 1 if temp_inds_all_plantation>0 & inds_notapplicable~=1
+{txt}(4,116,633 missing values generated)
+
+{com}. replace inds_all_plantation = 0 if temp_inds_all_plantation==0 & inds_notapplicable~=1
+{txt}(2,143,634 real changes made)
+
+{com}. drop temp_inds_all_plantation
+{txt}
+{com}. 
+. // mining
+. rename inds23 inds_metal
+{res}{txt}
+{com}. rename inds24 inds_mines
+{res}{txt}
+{com}. rename inds37 inds_utilities
+{res}{txt}
+{com}. local inds_mining_type inds_metal inds_mines inds_utilities
+{txt}
+{com}. egen temp_inds_all_mining = rowtotal(`inds_mining_type')
+{txt}
+{com}. gen inds_all_mining = 1 if temp_inds_all_mining>0 & inds_notapplicable~=1
+{txt}(4,497,452 missing values generated)
+
+{com}. replace inds_all_mining = 0 if temp_inds_all_mining==0 & inds_notapplicable~=1
+{txt}(2,524,453 real changes made)
+
+{com}. drop temp_inds_all_mining
+{txt}
+{com}. 
+. // left out, to be used later
+. rename inds# inds_#_dropped
+{res}{txt}
+{com}. drop *_dropped
+{txt}
+{com}. // rename inds5 inds_communication
+. // rename inds7 inds_defence
+. // rename inds8 inds_education
+. // rename inds9 inds_entertainsport
+. // rename inds10 inds_finance
+. // rename inds16 inds_gemjewellery
+. // rename inds17 inds_handicraft
+. // rename inds18 inds_healthcare
+. // rename inds19 inds_hotelresturant
+. // rename inds20 inds_IT
+. // rename inds22 inds_mediapublishing
+. // rename inds26 inds_nonprofession
+. // rename inds27 inds_professional
+. // rename inds31 inds_publicadmin
+. // rename inds32 inds_realestate
+. // rename inds33 inds_retail
+. // rename inds36 inds_traveltourism
+. // rename inds38 inds_wholesale
+. 
+. // relevant industry for the study
+. gen inds_relevant = (inds_all_mining+inds_all_plantation+inds_all_factories)>0 if inds_notapplicable~=1
+{txt}(1,972,999 missing values generated)
+
+{com}. gen inds_notrelevant = 1 - inds_relevant
+{txt}(1,972,999 missing values generated)
+
+{com}. 
+. * Treatment status: treated if for i, IDA is informed in s(i) in t 
+. * CAVEAT: STATE OF ORIGIN IS NOT THE STATUS WE WANT
+. gen reformed = 0
+{txt}
+{com}. replace reformed = 1 if state == "Maharashtra" & ((date_m >= 11 & date_y == 2017) | date_y>2017 )
+{txt}(198,683 real changes made)
+
+{com}. replace reformed = 1 if state == "Rajasthan" & ( (date_m >= 11 & date_y==2014) | date_y>2014  )
+{txt}(261,548 real changes made)
+
+{com}. replace reformed = 1 if state == "Madhya Pradesh" &  ( (date_m >=11 & date_y==2017) | date_y>2017 )
+{txt}(96,035 real changes made)
+
+{com}. replace reformed = 1 if state == "Haryana" & ( (date_m >=3 & date_y==2016) | date_y>2016 )
+{txt}(95,134 real changes made)
+
+{com}. replace reformed = 1 if state == "Gujarat" &  ( (date_m >=9 & date_y==2020) | date_y>2020 )
+{txt}(0 real changes made)
+
+{com}. replace reformed = 1 if state == "Assam" &  ( (date_m >=9 & date_y==2017) | date_y>2017 )
+{txt}(15,278 real changes made)
+
+{com}. 
+. * treated states (this is a state level variable)
+. gen state_ever_treated = 1 if inlist(state,"Maharashtra","Rajasthan","Madhya Pradesh","Haryana","Gujarat","Assam")
+{txt}(2,971,540 missing values generated)
+
+{com}. 
+. * Ever-treated status of individual, if changed multiple times -- reflecting migration
+. bysort id : egen temp_ever_reformed = sum(reformed)
+{txt}
+{com}. gen reformed_ever = temp_ever_reformed>0
+{txt}
+{com}. drop temp_ever_reformed
+{txt}
+{com}. tab reformed_ever if period ==1 
+
+{txt}reformed_ev {c |}
+         er {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}    387,491       79.24       79.24
+{txt}          1 {c |}{res}    101,533       20.76      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}    489,024      100.00
+{txt}
+{com}. 
+. * Change treatment status more than once: e.g. 0,0,1,1,0,0, 1=treated
+. bysort id (id_date): gen temp_last_reformed = reformed[_n-1]
+{txt}(489,024 missing values generated)
+
+{com}. gen temp_last_reformed_equal = reformed~=temp_last_reformed  if temp_last_reformed~=. // an one marks a change of reform status
+{txt}(489,024 missing values generated)
+
+{com}. replace temp_last_reformed_equal=0 if temp_last_reformed_equal==.
+{txt}(489,024 real changes made)
+
+{com}. bysort id  : egen temp_reformed_changetwice = sum(temp_last_reformed_equal)
+{txt}
+{com}. gen reformed_changetwice = 0 if temp_reformed_changetwice==0 | temp_reformed_changetwice==1
+{txt}
+{com}. replace reformed_changetwice = 1 if reformed_changetwice~=0
+{txt}(0 real changes made)
+
+{com}. 
+. tab reformed_changetwice
+
+{txt}reformed_ch {c |}
+  angetwice {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}  4,575,543      100.00      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}  4,575,543      100.00
+{txt}
+{com}. 
+. * Reformed cross early affected industry (mine, planation,factory)
+. // replace missing for not applicable
+. gen reformedxinds = reformed*inds_relevant
+{txt}(1,972,999 missing values generated)
+
+{com}. replace reformedxinds = 0 if reformedxinds==.
+{txt}(1,972,999 real changes made)
+
+{com}. gen reformedxinds_f = reformed*inds_all_factories
+{txt}(1,972,999 missing values generated)
+
+{com}. replace reformedxinds_f = 0 if reformedxinds_f==.
+{txt}(1,972,999 real changes made)
+
+{com}. gen reformedxinds_m = reformed*inds_all_mining
+{txt}(1,972,999 missing values generated)
+
+{com}. replace reformedxinds_m = 0 if reformedxinds_m==.
+{txt}(1,972,999 real changes made)
+
+{com}. gen reformedxinds_p = reformed*inds_all_plantation
+{txt}(1,972,999 missing values generated)
+
+{com}. replace reformedxinds_p = 0 if reformedxinds_p==.
+{txt}(1,972,999 real changes made)
+
+{com}. 
+. * reframe the industry tags (there is no possibility of multiple industry)
+. gen inds_reframe = -1  // this almost equals home maker
+{txt}
+{com}. replace inds_reframe = 1 if inds_all_factories==1
+{txt}(273,334 real changes made)
+
+{com}. replace inds_reframe = 2 if inds_all_mining==1
+{txt}(78,091 real changes made)
+
+{com}. replace inds_reframe = 3 if inds_all_plantation==1
+{txt}(458,910 real changes made)
+
+{com}. replace inds_reframe = 0 if inds_notrelevant==1
+{txt}(1,792,209 real changes made)
+
+{com}. 
+. * District level industry composition 
+. bysort id_dist id_date: egen emp_dist_date_total = count(id)
+{txt}
+{com}. foreach type in plantation factories mining {c -(}
+{txt}  2{com}.         bysort id_dist id_date: egen emp_dist_date_`type' = sum(inds_all_`type')
+{txt}  3{com}.         gen share_dist_date_`type' = emp_dist_date_`type'/emp_dist_date_total
+{txt}  4{com}. {c )-}
+{txt}
+{com}. 
+. * state level composition 
+. bysort id_state id_date: egen emp_state_date_total = count(id)
+{txt}
+{com}. foreach type in plantation factories mining {c -(}
+{txt}  2{com}.         bysort id_state id_date: egen emp_state_date_`type' = sum(inds_all_`type')
+{txt}  3{com}.         gen share_state_date_`type' = emp_state_date_`type'/emp_state_date_total
+{txt}  4{com}. {c )-}
+{txt}
+{com}. 
+. 
+. * District and state level industry employment transition of individuals, pre-post
+. bysort id (id_date) : gen inds_reframe_lag = inds_reframe[_n-1]
+{txt}(489,024 missing values generated)
+
+{com}. 
+. 
+. * (best way to show this is state by state by year, because some effects might wary overtime)
+. * (group state by treatment and control group)
+. 
+. 
+. save labor_reform_sample_Feb9ninght,replace
+{txt}file labor_reform_sample_Feb9ninght.dta saved
+
+{com}. 
+. 
+. **** mind the boundary cases. boundary at the treatment date
+. 
+. ********************************************************************************
+. *********** Summary stats: industry distribution and individual dynamics ******
+. ********************************************************************************
+. 
+. * distribution unconditional employment 
+. tab inds
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}      3,372        0.08        0.08
+{txt}Automobiles and Other Transport Equip.. {c |}{res}     20,322        0.49        0.57
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}     48,126        1.15        1.72
+{txt}                    Chemical Industries {c |}{res}     20,456        0.49        2.21
+{txt}          Communication, Post & Courier {c |}{res}     13,451        0.32        2.53
+{txt}                       Crop Cultivation {c |}{res}    400,458        9.58       12.11
+{txt}                       Defence Services {c |}{res}      8,570        0.20       12.31
+{txt}                              Education {c |}{res}    105,487        2.52       14.83
+{txt}               Entertainment and Sports {c |}{res}      3,243        0.08       14.91
+{txt}                     Financial Services {c |}{res}     46,743        1.12       16.03
+{txt}                                Fishing {c |}{res}      5,039        0.12       16.15
+{txt}                        Food Industries {c |}{res}     47,796        1.14       17.29
+{txt}  Footwear and other Leather Industries {c |}{res}     11,886        0.28       17.58
+{txt}        Forestry including Wood Cutting {c |}{res}        896        0.02       17.60
+{txt}           Fruits and Vegetable Farming {c |}{res}     35,392        0.85       18.45
+{txt}                       Gems & Jewellery {c |}{res}     11,845        0.28       18.73
+{txt}                  Handicraft Industries {c |}{res}      4,959        0.12       18.85
+{txt}                            Health Care {c |}{res}     29,004        0.69       19.54
+{txt}                 Hotels and Restaurants {c |}{res}     29,190        0.70       20.24
+{txt}                              IT & ITES {c |}{res}     15,089        0.36       20.60
+{txt}                Machinery Manufacturers {c |}{res}     33,505        0.80       21.40
+{txt}                   Media and Publishing {c |}{res}      5,236        0.13       21.53
+{txt}                       Metal Industries {c |}{res}     50,004        1.20       22.72
+{txt}                                  Mines {c |}{res}     11,528        0.28       23.00
+{txt}                         Not Applicable {c |}{res}  1,972,999       47.19       70.19
+{txt}     Personal Non-Professional Services {c |}{res}    149,396        3.57       73.76
+{txt}         Personal Professional Services {c |}{res}     20,044        0.48       74.24
+{txt}            Pharmaceutical Manufacturer {c |}{res}      7,416        0.18       74.42
+{txt}            Plantation Crop Cultivation {c |}{res}      3,120        0.07       74.49
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}     10,633        0.25       74.75
+{txt}         Public Administrative Services {c |}{res}     85,213        2.04       76.78
+{txt}             Real Estate & Construction {c |}{res}    355,172        8.49       85.28
+{txt}                           Retail Trade {c |}{res}    349,904        8.37       93.65
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}      7,190        0.17       93.82
+{txt}                     Textile Industries {c |}{res}     76,637        1.83       95.65
+{txt}                     Travel and Tourism {c |}{res}    134,953        3.23       98.88
+{txt}                              Utilities {c |}{res}     16,559        0.40       99.28
+{txt}                        Wholesale Trade {c |}{res}     30,227        0.72      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}  4,181,060      100.00
+{txt}
+{com}. tab inds_notapplicable
+
+  {txt}inds==Not {c |}
+ Applicable {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}  2,208,061       52.81       52.81
+{txt}          1 {c |}{res}  1,972,999       47.19      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}  4,181,060      100.00
+{txt}
+{com}. tab inds_notrelevant
+
+{txt}inds_notrel {c |}
+      evant {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}    810,335       31.14       31.14
+{txt}          1 {c |}{res}  1,792,209       68.86      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}  2,602,544      100.00
+{txt}
+{com}. tab inds_all_factories
+
+{txt}inds_all_fa {c |}
+    ctories {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}  2,329,210       89.50       89.50
+{txt}          1 {c |}{res}    273,334       10.50      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}  2,602,544      100.00
+{txt}
+{com}. tab inds_all_mining
+
+{txt}inds_all_mi {c |}
+       ning {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}  2,524,453       97.00       97.00
+{txt}          1 {c |}{res}     78,091        3.00      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}  2,602,544      100.00
+{txt}
+{com}. tab inds_all_plantation
+
+{txt}inds_all_pl {c |}
+   antation {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}  2,143,634       82.37       82.37
+{txt}          1 {c |}{res}    458,910       17.63      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}  2,602,544      100.00
+{txt}
+{com}. 
+. ******** CAVEAT all of these are not weighted --- the actual representative distribution of India should be more scrutinized. 
+. 
+. 
+. * What are the not applicable's occupation?
+. // after deleting ever-students and ever-retired, 94% of the not applicable are homemaker
+. tab nature if inds == "Not Applicable"
+
+                   {txt}NATURE_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+                  Agricultural Labourer {c |}{res}      2,573        0.13        0.13
+{txt}                            Businessman {c |}{res}      6,958        0.35        0.48
+{txt}                             Home Maker {c |}{res}  1,894,391       96.02       96.50
+{txt}                      Home-based Worker {c |}{res}        827        0.04       96.54
+{txt}                     Industrial Workers {c |}{res}      4,911        0.25       96.79
+{txt}    Legislator/Social Worker/ Activists {c |}{res}         32        0.00       96.79
+{txt}                                Manager {c |}{res}        460        0.02       96.81
+{txt}                       Organised Farmer {c |}{res}      2,232        0.11       96.93
+{txt}             Self employed professional {c |}{res}      3,871        0.20       97.12
+{txt}                           Small Farmer {c |}{res}      3,937        0.20       97.32
+{txt}Small Trader/Hawker/ Businessman with.. {c |}{res}      2,771        0.14       97.46
+{txt}                          Support Staff {c |}{res}      5,936        0.30       97.76
+{txt}                             Unoccupied {c |}{res}     18,908        0.96       98.72
+{txt}                          Wage Labourer {c |}{res}     17,204        0.87       99.60
+{txt}                    White collar worker {c |}{res}      7,988        0.40      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}  1,972,999      100.00
+{txt}
+{com}. 
+. * roughly industry employment distribution for the treated states
+. tab state inds_reframe if state_ever_treated == 1
+
+                 {txt}{c |}                inds_reframe
+           STATE {c |}        -1          0          1          2 {c |}     Total
+{hline 17}{c +}{hline 44}{c +}{hline 10}
+           Assam {c |}{res}    15,944     19,952      1,116        317 {txt}{c |}{res}    39,012 
+{txt}         Gujarat {c |}{res}   119,490    104,827     18,437      6,983 {txt}{c |}{res}   287,568 
+{txt}         Haryana {c |}{res}    67,024     61,483      7,935      1,789 {txt}{c |}{res}   148,605 
+{txt}  Madhya Pradesh {c |}{res}   118,973     94,406     15,197      4,597 {txt}{c |}{res}   270,539 
+{txt}     Maharashtra {c |}{res}   217,493    211,580     31,841      9,322 {txt}{c |}{res}   552,262 
+{txt}       Rajasthan {c |}{res}   143,878    130,184      8,710      2,275 {txt}{c |}{res}   306,017 
+{txt}{hline 17}{c +}{hline 44}{c +}{hline 10}
+           Total {c |}{res}   682,802    622,432     83,236     25,283 {txt}{c |}{res} 1,604,003 
+
+
+                 {txt}{c |} inds_refra
+                 {c |}     me
+           STATE {c |}         3 {c |}     Total
+{hline 17}{c +}{hline 11}{c +}{hline 10}
+           Assam {c |}{res}     1,683 {txt}{c |}{res}    39,012 
+{txt}         Gujarat {c |}{res}    37,831 {txt}{c |}{res}   287,568 
+{txt}         Haryana {c |}{res}    10,374 {txt}{c |}{res}   148,605 
+{txt}  Madhya Pradesh {c |}{res}    37,366 {txt}{c |}{res}   270,539 
+{txt}     Maharashtra {c |}{res}    82,026 {txt}{c |}{res}   552,262 
+{txt}       Rajasthan {c |}{res}    20,970 {txt}{c |}{res}   306,017 
+{txt}{hline 17}{c +}{hline 11}{c +}{hline 10}
+           Total {c |}{res}   190,250 {txt}{c |}{res} 1,604,003 
+{txt}
+{com}. 
+. * Summary stats about the reform
+. codebook reformed
+
+{txt}{hline}
+{res}reformed{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,908,865{col 33}0
+{col 21}   666,678{col 33}1
+{txt}
+{com}. tab reformed
+
+   {txt}reformed {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}  3,908,865       85.43       85.43
+{txt}          1 {c |}{res}    666,678       14.57      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}  4,575,543      100.00
+{txt}
+{com}. tab state reformed  
+
+                 {txt}{c |}       reformed
+           STATE {c |}         0          1 {c |}     Total
+{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Assam {c |}{res}    23,734     15,278 {txt}{c |}{res}    39,012 
+{txt}           Bihar {c |}{res}   278,235          0 {txt}{c |}{res}   278,235 
+{txt}      Chandigarh {c |}{res}    11,701          0 {txt}{c |}{res}    11,701 
+{txt}    Chhattisgarh {c |}{res}   144,763          0 {txt}{c |}{res}   144,763 
+{txt}           Delhi {c |}{res}    42,902          0 {txt}{c |}{res}    42,902 
+{txt}             Goa {c |}{res}    34,150          0 {txt}{c |}{res}    34,150 
+{txt}         Gujarat {c |}{res}   287,568          0 {txt}{c |}{res}   287,568 
+{txt}         Haryana {c |}{res}    53,471     95,134 {txt}{c |}{res}   148,605 
+{txt}Himachal Pradesh {c |}{res}    40,871          0 {txt}{c |}{res}    40,871 
+{txt} Jammu & Kashmir {c |}{res}    70,797          0 {txt}{c |}{res}    70,797 
+{txt}       Karnataka {c |}{res}   260,313          0 {txt}{c |}{res}   260,313 
+{txt}          Kerala {c |}{res}   111,688          0 {txt}{c |}{res}   111,688 
+{txt}  Madhya Pradesh {c |}{res}   174,504     96,035 {txt}{c |}{res}   270,539 
+{txt}     Maharashtra {c |}{res}   353,579    198,683 {txt}{c |}{res}   552,262 
+{txt}       Meghalaya {c |}{res}    13,117          0 {txt}{c |}{res}    13,117 
+{txt}          Odisha {c |}{res}   181,016          0 {txt}{c |}{res}   181,016 
+{txt}      Puducherry {c |}{res}    31,220          0 {txt}{c |}{res}    31,220 
+{txt}          Punjab {c |}{res}   192,244          0 {txt}{c |}{res}   192,244 
+{txt}       Rajasthan {c |}{res}    44,469    261,548 {txt}{c |}{res}   306,017 
+{txt}          Sikkim {c |}{res}     3,558          0 {txt}{c |}{res}     3,558 
+{txt}      Tamil Nadu {c |}{res}   266,244          0 {txt}{c |}{res}   266,244 
+{txt}       Telangana {c |}{res}   150,369          0 {txt}{c |}{res}   150,369 
+{txt}         Tripura {c |}{res}    14,680          0 {txt}{c |}{res}    14,680 
+{txt}   Uttar Pradesh {c |}{res}   708,663          0 {txt}{c |}{res}   708,663 
+{txt}     Uttarakhand {c |}{res}    53,553          0 {txt}{c |}{res}    53,553 
+{txt}     West Bengal {c |}{res}   361,456          0 {txt}{c |}{res}   361,456 
+{txt}{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Total {c |}{res} 3,908,865    666,678 {txt}{c |}{res} 4,575,543 
+{txt}
+{com}. tab state reformed if state_ever_treated == 1
+
+                 {txt}{c |}       reformed
+           STATE {c |}         0          1 {c |}     Total
+{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Assam {c |}{res}    23,734     15,278 {txt}{c |}{res}    39,012 
+{txt}         Gujarat {c |}{res}   287,568          0 {txt}{c |}{res}   287,568 
+{txt}         Haryana {c |}{res}    53,471     95,134 {txt}{c |}{res}   148,605 
+{txt}  Madhya Pradesh {c |}{res}   174,504     96,035 {txt}{c |}{res}   270,539 
+{txt}     Maharashtra {c |}{res}   353,579    198,683 {txt}{c |}{res}   552,262 
+{txt}       Rajasthan {c |}{res}    44,469    261,548 {txt}{c |}{res}   306,017 
+{txt}{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Total {c |}{res}   937,325    666,678 {txt}{c |}{res} 1,604,003 
+{txt}
+{com}. local list_states_treated Maharashtra Rajasthan "Madhya Pradesh" Haryana Gujarat Assam
+{txt}
+{com}. foreach var in `list_states_treated'{c -(}
+{txt}  2{com}.         disp("*************************")
+{txt}  3{com}.         disp("Current State is `var'")
+{txt}  4{com}.         disp("*************************")
+{txt}  5{com}. tab inds if state =="`var'"
+{txt}  6{com}. {c )-}
+*************************
+Current State is Maharashtra
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}        512        0.10        0.10
+{txt}Automobiles and Other Transport Equip.. {c |}{res}      3,772        0.74        0.84
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}      1,715        0.34        1.18
+{txt}                    Chemical Industries {c |}{res}      3,937        0.78        1.96
+{txt}          Communication, Post & Courier {c |}{res}      1,542        0.30        2.26
+{txt}                       Crop Cultivation {c |}{res}     71,815       14.15       16.41
+{txt}                       Defence Services {c |}{res}        477        0.09       16.51
+{txt}                              Education {c |}{res}     11,735        2.31       18.82
+{txt}               Entertainment and Sports {c |}{res}        442        0.09       18.91
+{txt}                     Financial Services {c |}{res}     11,933        2.35       21.26
+{txt}                                Fishing {c |}{res}        712        0.14       21.40
+{txt}                        Food Industries {c |}{res}      4,043        0.80       22.19
+{txt}  Footwear and other Leather Industries {c |}{res}        814        0.16       22.35
+{txt}        Forestry including Wood Cutting {c |}{res}         62        0.01       22.37
+{txt}           Fruits and Vegetable Farming {c |}{res}      8,028        1.58       23.95
+{txt}                       Gems & Jewellery {c |}{res}      1,105        0.22       24.17
+{txt}                  Handicraft Industries {c |}{res}        309        0.06       24.23
+{txt}                            Health Care {c |}{res}      3,770        0.74       24.97
+{txt}                 Hotels and Restaurants {c |}{res}      4,945        0.97       25.94
+{txt}                              IT & ITES {c |}{res}      2,180        0.43       26.37
+{txt}                Machinery Manufacturers {c |}{res}      6,751        1.33       27.70
+{txt}                   Media and Publishing {c |}{res}      1,156        0.23       27.93
+{txt}                       Metal Industries {c |}{res}      6,240        1.23       29.16
+{txt}                                  Mines {c |}{res}        751        0.15       29.31
+{txt}                         Not Applicable {c |}{res}    217,493       42.85       72.16
+{txt}     Personal Non-Professional Services {c |}{res}     18,985        3.74       75.90
+{txt}         Personal Professional Services {c |}{res}      2,403        0.47       76.38
+{txt}            Pharmaceutical Manufacturer {c |}{res}      1,878        0.37       76.75
+{txt}            Plantation Crop Cultivation {c |}{res}        256        0.05       76.80
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}        641        0.13       76.92
+{txt}         Public Administrative Services {c |}{res}     10,202        2.01       78.94
+{txt}             Real Estate & Construction {c |}{res}     35,073        6.91       85.85
+{txt}                           Retail Trade {c |}{res}     34,304        6.76       92.61
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}        758        0.15       92.75
+{txt}                     Textile Industries {c |}{res}      8,173        1.61       94.37
+{txt}                     Travel and Tourism {c |}{res}     22,015        4.34       98.70
+{txt}                              Utilities {c |}{res}      2,331        0.46       99.16
+{txt}                        Wholesale Trade {c |}{res}      4,252        0.84      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}    507,510      100.00
+*************************
+Current State is Rajasthan
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}        174        0.06        0.06
+{txt}Automobiles and Other Transport Equip.. {c |}{res}        517        0.19        0.25
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}      1,844        0.66        0.91
+{txt}                    Chemical Industries {c |}{res}        421        0.15        1.06
+{txt}          Communication, Post & Courier {c |}{res}        286        0.10        1.16
+{txt}                       Crop Cultivation {c |}{res}     20,011        7.18        8.35
+{txt}                       Defence Services {c |}{res}        358        0.13        8.47
+{txt}                              Education {c |}{res}     10,537        3.78       12.26
+{txt}               Entertainment and Sports {c |}{res}        106        0.04       12.29
+{txt}                     Financial Services {c |}{res}      1,937        0.70       12.99
+{txt}                                Fishing {c |}{res}         36        0.01       13.00
+{txt}                        Food Industries {c |}{res}      1,918        0.69       13.69
+{txt}  Footwear and other Leather Industries {c |}{res}        362        0.13       13.82
+{txt}        Forestry including Wood Cutting {c |}{res}         55        0.02       13.84
+{txt}           Fruits and Vegetable Farming {c |}{res}        578        0.21       14.05
+{txt}                       Gems & Jewellery {c |}{res}        845        0.30       14.35
+{txt}                  Handicraft Industries {c |}{res}        255        0.09       14.44
+{txt}                            Health Care {c |}{res}      1,793        0.64       15.09
+{txt}                 Hotels and Restaurants {c |}{res}      1,095        0.39       15.48
+{txt}                              IT & ITES {c |}{res}         65        0.02       15.50
+{txt}                Machinery Manufacturers {c |}{res}        538        0.19       15.69
+{txt}                   Media and Publishing {c |}{res}         89        0.03       15.73
+{txt}                       Metal Industries {c |}{res}        483        0.17       15.90
+{txt}                                  Mines {c |}{res}        833        0.30       16.20
+{txt}                         Not Applicable {c |}{res}    143,878       51.64       67.83
+{txt}     Personal Non-Professional Services {c |}{res}      5,174        1.86       69.69
+{txt}         Personal Professional Services {c |}{res}      1,280        0.46       70.15
+{txt}            Pharmaceutical Manufacturer {c |}{res}         63        0.02       70.17
+{txt}            Plantation Crop Cultivation {c |}{res}         26        0.01       70.18
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}         90        0.03       70.22
+{txt}         Public Administrative Services {c |}{res}      4,082        1.46       71.68
+{txt}             Real Estate & Construction {c |}{res}     40,239       14.44       86.12
+{txt}                           Retail Trade {c |}{res}     28,185       10.12       96.24
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}        317        0.11       96.35
+{txt}                     Textile Industries {c |}{res}      2,730        0.98       97.33
+{txt}                     Travel and Tourism {c |}{res}      5,081        1.82       99.15
+{txt}                              Utilities {c |}{res}        959        0.34       99.50
+{txt}                        Wholesale Trade {c |}{res}      1,399        0.50      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}    278,639      100.00
+*************************
+Current State is Madhya Pradesh
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}         71        0.03        0.03
+{txt}Automobiles and Other Transport Equip.. {c |}{res}        515        0.21        0.24
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}      1,989        0.81        1.05
+{txt}                    Chemical Industries {c |}{res}        485        0.20        1.25
+{txt}          Communication, Post & Courier {c |}{res}        426        0.17        1.42
+{txt}                       Crop Cultivation {c |}{res}     33,778       13.76       15.18
+{txt}                       Defence Services {c |}{res}        198        0.08       15.26
+{txt}                              Education {c |}{res}      7,109        2.90       18.16
+{txt}               Entertainment and Sports {c |}{res}        174        0.07       18.23
+{txt}                     Financial Services {c |}{res}      1,885        0.77       19.00
+{txt}                                Fishing {c |}{res}         37        0.02       19.02
+{txt}                        Food Industries {c |}{res}      4,624        1.88       20.90
+{txt}  Footwear and other Leather Industries {c |}{res}        473        0.19       21.09
+{txt}        Forestry including Wood Cutting {c |}{res}         90        0.04       21.13
+{txt}           Fruits and Vegetable Farming {c |}{res}      3,001        1.22       22.35
+{txt}                       Gems & Jewellery {c |}{res}        329        0.13       22.49
+{txt}                  Handicraft Industries {c |}{res}        603        0.25       22.73
+{txt}                            Health Care {c |}{res}      1,154        0.47       23.20
+{txt}                 Hotels and Restaurants {c |}{res}      1,787        0.73       23.93
+{txt}                              IT & ITES {c |}{res}        134        0.05       23.98
+{txt}                Machinery Manufacturers {c |}{res}      1,688        0.69       24.67
+{txt}                   Media and Publishing {c |}{res}        189        0.08       24.75
+{txt}                       Metal Industries {c |}{res}        854        0.35       25.10
+{txt}                                  Mines {c |}{res}      2,995        1.22       26.32
+{txt}                         Not Applicable {c |}{res}    118,973       48.48       74.79
+{txt}     Personal Non-Professional Services {c |}{res}     10,568        4.31       79.10
+{txt}         Personal Professional Services {c |}{res}      1,086        0.44       79.54
+{txt}            Pharmaceutical Manufacturer {c |}{res}        181        0.07       79.62
+{txt}            Plantation Crop Cultivation {c |}{res}         87        0.04       79.65
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}        302        0.12       79.78
+{txt}         Public Administrative Services {c |}{res}      3,593        1.46       81.24
+{txt}             Real Estate & Construction {c |}{res}     14,606        5.95       87.19
+{txt}                           Retail Trade {c |}{res}     19,652        8.01       95.20
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}      1,803        0.73       95.93
+{txt}                     Textile Industries {c |}{res}      3,439        1.40       97.33
+{txt}                     Travel and Tourism {c |}{res}      4,361        1.78       99.11
+{txt}                              Utilities {c |}{res}        748        0.30       99.42
+{txt}                        Wholesale Trade {c |}{res}      1,432        0.58      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}    245,419      100.00
+*************************
+Current State is Haryana
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}        128        0.09        0.09
+{txt}Automobiles and Other Transport Equip.. {c |}{res}      1,008        0.75        0.84
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}        577        0.43        1.27
+{txt}                    Chemical Industries {c |}{res}        537        0.40        1.67
+{txt}          Communication, Post & Courier {c |}{res}        527        0.39        2.06
+{txt}                       Crop Cultivation {c |}{res}      9,591        7.11        9.17
+{txt}                       Defence Services {c |}{res}        414        0.31        9.47
+{txt}                              Education {c |}{res}      4,161        3.08       12.56
+{txt}               Entertainment and Sports {c |}{res}         74        0.05       12.61
+{txt}                     Financial Services {c |}{res}      1,890        1.40       14.01
+{txt}                        Food Industries {c |}{res}      1,157        0.86       14.87
+{txt}  Footwear and other Leather Industries {c |}{res}        833        0.62       15.49
+{txt}        Forestry including Wood Cutting {c |}{res}         11        0.01       15.50
+{txt}           Fruits and Vegetable Farming {c |}{res}        476        0.35       15.85
+{txt}                       Gems & Jewellery {c |}{res}         87        0.06       15.91
+{txt}                  Handicraft Industries {c |}{res}         23        0.02       15.93
+{txt}                            Health Care {c |}{res}        982        0.73       16.66
+{txt}                 Hotels and Restaurants {c |}{res}        563        0.42       17.08
+{txt}                              IT & ITES {c |}{res}        875        0.65       17.72
+{txt}                Machinery Manufacturers {c |}{res}      1,077        0.80       18.52
+{txt}                   Media and Publishing {c |}{res}        141        0.10       18.63
+{txt}                       Metal Industries {c |}{res}      1,258        0.93       19.56
+{txt}                                  Mines {c |}{res}         82        0.06       19.62
+{txt}                         Not Applicable {c |}{res}     67,024       49.68       69.30
+{txt}     Personal Non-Professional Services {c |}{res}      1,875        1.39       70.69
+{txt}         Personal Professional Services {c |}{res}        694        0.51       71.20
+{txt}            Pharmaceutical Manufacturer {c |}{res}        170        0.13       71.33
+{txt}            Plantation Crop Cultivation {c |}{res}          7        0.01       71.33
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}        161        0.12       71.45
+{txt}         Public Administrative Services {c |}{res}      3,696        2.74       74.19
+{txt}             Real Estate & Construction {c |}{res}     10,789        8.00       82.19
+{txt}                           Retail Trade {c |}{res}     16,246       12.04       94.23
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}        180        0.13       94.36
+{txt}                     Textile Industries {c |}{res}      2,396        1.78       96.14
+{txt}                     Travel and Tourism {c |}{res}      2,833        2.10       98.24
+{txt}                              Utilities {c |}{res}        449        0.33       98.57
+{txt}                        Wholesale Trade {c |}{res}      1,929        1.43      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}    134,921      100.00
+*************************
+Current State is Gujarat
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}         51        0.02        0.02
+{txt}Automobiles and Other Transport Equip.. {c |}{res}      1,027        0.39        0.41
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}      1,210        0.46        0.87
+{txt}                    Chemical Industries {c |}{res}      3,205        1.21        2.08
+{txt}          Communication, Post & Courier {c |}{res}        778        0.29        2.37
+{txt}                       Crop Cultivation {c |}{res}     30,347       11.48       13.85
+{txt}                       Defence Services {c |}{res}        125        0.05       13.90
+{txt}                              Education {c |}{res}      2,489        0.94       14.84
+{txt}               Entertainment and Sports {c |}{res}        230        0.09       14.93
+{txt}                     Financial Services {c |}{res}      1,323        0.50       15.43
+{txt}                                Fishing {c |}{res}        122        0.05       15.48
+{txt}                        Food Industries {c |}{res}      1,599        0.60       16.08
+{txt}  Footwear and other Leather Industries {c |}{res}        169        0.06       16.15
+{txt}        Forestry including Wood Cutting {c |}{res}         23        0.01       16.16
+{txt}           Fruits and Vegetable Farming {c |}{res}      1,394        0.53       16.68
+{txt}                       Gems & Jewellery {c |}{res}      3,625        1.37       18.05
+{txt}                  Handicraft Industries {c |}{res}        284        0.11       18.16
+{txt}                            Health Care {c |}{res}      1,558        0.59       18.75
+{txt}                 Hotels and Restaurants {c |}{res}      1,704        0.64       19.40
+{txt}                              IT & ITES {c |}{res}        111        0.04       19.44
+{txt}                Machinery Manufacturers {c |}{res}      2,610        0.99       20.43
+{txt}                   Media and Publishing {c |}{res}        246        0.09       20.52
+{txt}                       Metal Industries {c |}{res}      5,823        2.20       22.72
+{txt}                                  Mines {c |}{res}        185        0.07       22.79
+{txt}                         Not Applicable {c |}{res}    119,490       45.21       68.00
+{txt}     Personal Non-Professional Services {c |}{res}     27,933       10.57       78.57
+{txt}         Personal Professional Services {c |}{res}      1,314        0.50       79.07
+{txt}            Pharmaceutical Manufacturer {c |}{res}        993        0.38       79.44
+{txt}            Plantation Crop Cultivation {c |}{res}        400        0.15       79.59
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}      5,494        2.08       81.67
+{txt}         Public Administrative Services {c |}{res}      3,157        1.19       82.87
+{txt}             Real Estate & Construction {c |}{res}      7,760        2.94       85.80
+{txt}                           Retail Trade {c |}{res}     17,487        6.62       92.42
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}        226        0.09       92.51
+{txt}                     Textile Industries {c |}{res}      7,398        2.80       95.30
+{txt}                     Travel and Tourism {c |}{res}     10,545        3.99       99.29
+{txt}                              Utilities {c |}{res}        975        0.37       99.66
+{txt}                        Wholesale Trade {c |}{res}        889        0.34      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}    264,299      100.00
+*************************
+Current State is Assam
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}         45        0.13        0.13
+{txt}Automobiles and Other Transport Equip.. {c |}{res}        157        0.44        0.57
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}         61        0.17        0.74
+{txt}                    Chemical Industries {c |}{res}         40        0.11        0.85
+{txt}          Communication, Post & Courier {c |}{res}        210        0.59        1.45
+{txt}                       Crop Cultivation {c |}{res}      1,553        4.37        5.82
+{txt}                       Defence Services {c |}{res}        114        0.32        6.14
+{txt}                              Education {c |}{res}      1,192        3.36        9.50
+{txt}               Entertainment and Sports {c |}{res}         51        0.14        9.64
+{txt}                     Financial Services {c |}{res}        584        1.65       11.29
+{txt}                                Fishing {c |}{res}          8        0.02       11.31
+{txt}                        Food Industries {c |}{res}        544        1.53       12.84
+{txt}  Footwear and other Leather Industries {c |}{res}         15        0.04       12.89
+{txt}        Forestry including Wood Cutting {c |}{res}          1        0.00       12.89
+{txt}           Fruits and Vegetable Farming {c |}{res}         18        0.05       12.94
+{txt}                       Gems & Jewellery {c |}{res}         44        0.12       13.06
+{txt}                  Handicraft Industries {c |}{res}         10        0.03       13.09
+{txt}                            Health Care {c |}{res}        490        1.38       14.47
+{txt}                 Hotels and Restaurants {c |}{res}        381        1.07       15.54
+{txt}                              IT & ITES {c |}{res}         22        0.06       15.61
+{txt}                Machinery Manufacturers {c |}{res}         44        0.12       15.73
+{txt}                   Media and Publishing {c |}{res}        217        0.61       16.34
+{txt}                       Metal Industries {c |}{res}         59        0.17       16.51
+{txt}                                  Mines {c |}{res}         35        0.10       16.61
+{txt}                         Not Applicable {c |}{res}     15,944       44.92       61.52
+{txt}     Personal Non-Professional Services {c |}{res}      2,064        5.81       67.34
+{txt}         Personal Professional Services {c |}{res}        305        0.86       68.20
+{txt}            Pharmaceutical Manufacturer {c |}{res}         72        0.20       68.40
+{txt}            Plantation Crop Cultivation {c |}{res}         24        0.07       68.47
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}         34        0.10       68.56
+{txt}         Public Administrative Services {c |}{res}        811        2.28       70.85
+{txt}             Real Estate & Construction {c |}{res}      2,935        8.27       79.11
+{txt}                           Retail Trade {c |}{res}      5,040       14.20       93.31
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}         35        0.10       93.41
+{txt}                     Textile Industries {c |}{res}        148        0.42       93.83
+{txt}                     Travel and Tourism {c |}{res}      1,389        3.91       97.74
+{txt}                              Utilities {c |}{res}        223        0.63       98.37
+{txt}                        Wholesale Trade {c |}{res}        579        1.63      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}     35,498      100.00
+{txt}
+{com}. 
+. 
+. ******* Caveat: this needs to be done controlling for occupation: we don't care managers in factories's moving around. 
+. 
+. 
+. 
+. * Transition
+. tab inds_reframe_lag inds_reframe if reformed==1, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                      inds_reframe
+    me_lag {c |}        -1          0          1          2          3 {c |}     Total
+{hline 11}{c +}{hline 55}{c +}{hline 10}
+        -1 {c |}{res}   286,904      7,754        912        247      4,033 {txt}{c |}{res}   299,850 
+           {txt}{c |}{res}     95.68       2.59       0.30       0.08       1.35 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         0 {c |}{res}     8,877    200,080      9,563      2,875     10,898 {txt}{c |}{res}   232,293 
+           {txt}{c |}{res}      3.82      86.13       4.12       1.24       4.69 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         1 {c |}{res}       859     10,496     12,654      1,414        756 {txt}{c |}{res}    26,179 
+           {txt}{c |}{res}      3.28      40.09      48.34       5.40       2.89 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         2 {c |}{res}       106      2,790      1,307      3,485        235 {txt}{c |}{res}     7,923 
+           {txt}{c |}{res}      1.34      35.21      16.50      43.99       2.97 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         3 {c |}{res}     4,237      8,976        728        205     63,214 {txt}{c |}{res}    77,360 
+           {txt}{c |}{res}      5.48      11.60       0.94       0.26      81.71 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+     Total {c |}{res}   300,983    230,096     25,164      8,226     79,136 {txt}{c |}{res}   643,605 
+           {txt}{c |}{res}     46.77      35.75       3.91       1.28      12.30 {txt}{c |}{res}    100.00 
+{txt}
+{com}. tab inds_reframe_lag inds_reframe if reformed==0, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                      inds_reframe
+    me_lag {c |}        -1          0          1          2          3 {c |}     Total
+{hline 11}{c +}{hline 55}{c +}{hline 10}
+        -1 {c |}{res} 1,336,654     63,664     21,059      3,918     27,271 {txt}{c |}{res} 1,452,566 
+           {txt}{c |}{res}     92.02       4.38       1.45       0.27       1.88 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         0 {c |}{res}   207,874  1,011,025     79,900     21,272     58,164 {txt}{c |}{res} 1,378,235 
+           {txt}{c |}{res}     15.08      73.36       5.80       1.54       4.22 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         1 {c |}{res}     9,670     72,329    120,504      8,070      9,343 {txt}{c |}{res}   219,916 
+           {txt}{c |}{res}      4.40      32.89      54.80       3.67       4.25 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         2 {c |}{res}     1,199     18,592      8,459     32,518      1,448 {txt}{c |}{res}    62,216 
+           {txt}{c |}{res}      1.93      29.88      13.60      52.27       2.33 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         3 {c |}{res}    17,556     39,871      7,196      1,160    264,198 {txt}{c |}{res}   329,981 
+           {txt}{c |}{res}      5.32      12.08       2.18       0.35      80.06 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+     Total {c |}{res} 1,572,953  1,205,481    237,118     66,938    360,424 {txt}{c |}{res} 3,442,914 
+           {txt}{c |}{res}     45.69      35.01       6.89       1.94      10.47 {txt}{c |}{res}    100.00 
+{txt}
+{com}. tab inds_reframe_lag inds_reframe if reformed==1 & state_ever_treated==1, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                      inds_reframe
+    me_lag {c |}        -1          0          1          2          3 {c |}     Total
+{hline 11}{c +}{hline 55}{c +}{hline 10}
+        -1 {c |}{res}   286,904      7,754        912        247      4,033 {txt}{c |}{res}   299,850 
+           {txt}{c |}{res}     95.68       2.59       0.30       0.08       1.35 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         0 {c |}{res}     8,877    200,080      9,563      2,875     10,898 {txt}{c |}{res}   232,293 
+           {txt}{c |}{res}      3.82      86.13       4.12       1.24       4.69 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         1 {c |}{res}       859     10,496     12,654      1,414        756 {txt}{c |}{res}    26,179 
+           {txt}{c |}{res}      3.28      40.09      48.34       5.40       2.89 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         2 {c |}{res}       106      2,790      1,307      3,485        235 {txt}{c |}{res}     7,923 
+           {txt}{c |}{res}      1.34      35.21      16.50      43.99       2.97 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         3 {c |}{res}     4,237      8,976        728        205     63,214 {txt}{c |}{res}    77,360 
+           {txt}{c |}{res}      5.48      11.60       0.94       0.26      81.71 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+     Total {c |}{res}   300,983    230,096     25,164      8,226     79,136 {txt}{c |}{res}   643,605 
+           {txt}{c |}{res}     46.77      35.75       3.91       1.28      12.30 {txt}{c |}{res}    100.00 
+{txt}
+{com}. tab inds_reframe_lag inds_reframe if reformed==0 & state_ever_treated==1, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                      inds_reframe
+    me_lag {c |}        -1          0          1          2          3 {c |}     Total
+{hline 11}{c +}{hline 55}{c +}{hline 10}
+        -1 {c |}{res}   263,293     18,448      5,278      1,284     11,494 {txt}{c |}{res}   299,797 
+           {txt}{c |}{res}     87.82       6.15       1.76       0.43       3.83 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         0 {c |}{res}    64,638    215,031     18,401      5,786     15,363 {txt}{c |}{res}   319,219 
+           {txt}{c |}{res}     20.25      67.36       5.76       1.81       4.81 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         1 {c |}{res}     1,964     14,818     26,289      2,090      1,712 {txt}{c |}{res}    46,873 
+           {txt}{c |}{res}      4.19      31.61      56.09       4.46       3.65 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         2 {c |}{res}       367      4,799      2,350      6,481        444 {txt}{c |}{res}    14,441 
+           {txt}{c |}{res}      2.54      33.23      16.27      44.88       3.07 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         3 {c |}{res}     7,307      8,516      1,265        341     72,186 {txt}{c |}{res}    89,615 
+           {txt}{c |}{res}      8.15       9.50       1.41       0.38      80.55 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+     Total {c |}{res}   337,569    261,612     53,583     15,982    101,199 {txt}{c |}{res}   769,945 
+           {txt}{c |}{res}     43.84      33.98       6.96       2.08      13.14 {txt}{c |}{res}    100.00 
+{txt}
+{com}. 
+. 
+. * Share trend overtime using collapsed-sample
+. 
+. 
+. 
+. * check data range, type, missing
+. codebook 
+
+{txt}{hline}
+{res}id{right:group(hh_id mem_id)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}2{txt},{res}887886{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}489,024{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}  443663
+{txt}{col 15}std. dev:{res}{col 26}  256135
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}   88702{col 37}  222049{col 47}  443851{col 57}  665331{col 67}  798423
+
+{txt}{hline}
+{res}hh_id{right:HH_ID}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}long{txt})
+
+{col 18}range:  [{res}10000111{txt},{res}99998894{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}188,924{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 5.1e+07
+{txt}{col 15}std. dev:{res}{col 26} 2.7e+07
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 1.5e+07{col 37} 2.5e+07{col 47} 5.0e+07{col 57} 7.5e+07{col 67} 9.0e+07
+
+{txt}{hline}
+{res}mem_id{right:MEM_ID}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}1{txt},{res}45{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}45{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 2.62844
+{txt}{col 15}std. dev:{res}{col 26} 2.37496
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       1{col 37}       1{col 47}       2{col 57}       3{col 67}       5
+
+{txt}{hline}
+{res}date_y{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}int{txt})
+
+{col 18}range:  [{res}2014{txt},{res}2019{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}6{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}   770,070{col 33}2014
+{col 21}   768,948{col 33}2015
+{col 21}   734,229{col 33}2016
+{col 21}   722,292{col 33}2017
+{col 21}   789,067{col 33}2018
+{col 21}   790,937{col 33}2019
+
+{txt}{hline}
+{res}date_m{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}1{txt},{res}12{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}12{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 6.56786
+{txt}{col 15}std. dev:{res}{col 26} 3.40959
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       2{col 37}       4{col 47}       7{col 57}      10{col 67}      11
+
+{txt}{hline}
+{res}id_date{right:group(date_str)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}71{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}71{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 35.7682
+{txt}{col 15}std. dev:{res}{col 26} 20.9076
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       7{col 37}      17{col 47}      36{col 57}      54{col 67}      65
+
+{txt}{hline}
+{res}month_of_income_data{right:MONTH}
+{txt}{hline}
+
+{col 19}type:  string ({res}str8{txt})
+
+{col 10}unique values:  {res}71{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Dec 2016"
+{col 26}"Jan 2017"
+{col 26}"Mar 2014"
+{col 26}"Nov 2016"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}month_slot{right:MONTH_SLOT}
+{txt}{hline}
+
+{col 19}type:  string ({res}str8{txt})
+
+{col 10}unique values:  {res}71{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Dec 2015"
+{col 26}"Jan 2019"
+{col 26}"Mar 2015"
+{col 26}"Nov 2017"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}gender{right:GENDER}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str1
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,329,367{col 33}"F"
+{col 21} 2,246,176{col 33}"M"
+
+{txt}{hline}
+{res}age_yrs{right:AGE_YRS}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}int{txt})
+
+{col 18}range:  [{res}15{txt},{res}106{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}91{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}  39.278
+{txt}{col 15}std. dev:{res}{col 26} 10.7506
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}      25{col 37}      31{col 47}      39{col 57}      47{col 67}      54
+
+{txt}{hline}
+{res}age_mths{right:AGE_MTHS}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}11{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}12{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .704981
+{txt}{col 15}std. dev:{res}{col 26} 2.02728
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       4
+
+{txt}{hline}
+{res}relation_with_hoh{right:RELATION_WITH_HOH}
+{txt}{hline}
+
+{col 19}type:  string ({res}str43{txt})
+
+{col 10}unique values:  {res}20{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"HOH"
+{col 26}"HOH"
+{col 26}"Son"
+{col 26}"Spouse"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}state_of_origin{right:STATE_OF_ORIGIN}
+{txt}{hline}
+
+{col 19}type:  string ({res}str25{txt}), but longest is str17
+
+{col 10}unique values:  {res}35{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Gujarat"
+{col 26}"Madhya Pradesh"
+{col 26}"Punjab"
+{col 26}"Uttar Pradesh"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}religion{right:RELIGION}
+{txt}{hline}
+
+{col 19}type:  string ({res}str19{txt})
+
+{col 10}unique values:  {res}10{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Hindu"
+{col 26}"Hindu"
+{col 26}"Hindu"
+{col 26}"Hindu"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}caste{right:CASTE}
+{txt}{hline}
+
+{col 19}type:  string ({res}str95{txt})
+
+{col 10}unique values:  {res}414{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Caste not stated"
+{col 26}"Kokna"
+{col 26}"Other OBC"
+{col 26}"Rajputs"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}caste_category{right:CASTE_CATEGORY}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt})
+
+{col 10}unique values:  {res}7{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}   428,121{col 33}"Intermediate Caste"
+{col 21}        50{col 33}"Not Applicable"
+{col 21}    88,348{col 33}"Not Stated"
+{col 21} 1,713,920{col 33}"OBC"
+{col 21}   971,201{col 33}"SC"
+{col 21}   239,959{col 33}"ST"
+{col 21} 1,133,944{col 33}"Upper Caste"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}literacy{right:LITERACY}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str1
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}   542,171{col 33}"N"
+{col 21} 4,033,372{col 33}"Y"
+
+{txt}{hline}
+{res}education{right:EDUCATION}
+{txt}{hline}
+
+{col 19}type:  string ({res}str28{txt})
+
+{col 10}unique values:  {res}17{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"12th Std. Pass"
+{col 26}"5th Std. Pass"
+{col 26}"8th Std. Pass"
+{col 26}"Graduate"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}discipline{right:DISCIPLINE}
+{txt}{hline}
+
+{col 19}type:  string ({res}str60{txt})
+
+{col 10}unique values:  {res}30{col 51}{txt}missing "":  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Arts"
+{col 26}"Not Applicable"
+{col 26}"Not Applicable"
+{col 26}"Not Applicable"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}nature{right:NATURE_OF_OCCUPATION}
+{txt}{hline}
+
+{col 19}type:  string ({res}str55{txt})
+
+{col 10}unique values:  {res}20{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Home Maker"
+{col 26}"Home Maker"
+{col 26}"Organised Farmer"
+{col 26}"Support Staff"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}inds{right:INDUSTRY_OF_OCCUPATION}
+{txt}{hline}
+
+{col 19}type:  string ({res}str71{txt})
+
+{col 10}unique values:  {res}38{col 51}{txt}missing "":  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Education"
+{col 26}"Not Applicable"
+{col 26}"Not Applicable"
+{col 26}"Real Estate & Construction"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}inc_all_source{right:INCOME_OF_MEMBER_FROM_ALL_SOURCES}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}long{txt})
+
+{col 18}range:  [{res}0{txt},{res}2250000{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}6,882{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 5634.21
+{txt}{col 15}std. dev:{res}{col 26} 9983.34
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}    8000{col 67}   15000
+
+{txt}{hline}
+{res}inc_wages{right:INCOME_OF_MEMBER_FROM_WAGES}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}long{txt})
+
+{col 18}range:  [{res}0{txt},{res}2250000{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}5,449{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 5610.55
+{txt}{col 15}std. dev:{res}{col 26} 9938.28
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}    8000{col 67}   15000
+
+{txt}{hline}
+{res}inc_pension{right:INCOME_OF_MEMBER_FROM_PENSION}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}long{txt})
+
+{col 18}range:  [{res}0{txt},{res}100000{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}284{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 14.7167
+{txt}{col 15}std. dev:{res}{col 26} 440.351
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}inc_dividend{right:INCOME_OF_MEMBER_FROM_DIVIDEND}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}long{txt})
+
+{col 18}range:  [{res}0{txt},{res}300000{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}108{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1.34941
+{txt}{col 15}std. dev:{res}{col 26} 270.624
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}inc_interest{right:INCOME_OF_MEMBER_FROM_INTEREST}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}long{txt})
+
+{col 18}range:  [{res}0{txt},{res}300000{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}342{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 3.49528
+{txt}{col 15}std. dev:{res}{col 26} 246.998
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}family_shifted{right:FAMILY_SHIFTED}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str1
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}1,688,157{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,688,157{col 33}""
+{col 21} 2,873,869{col 33}"N"
+{col 21}    13,517{col 33}"Y"
+
+{txt}{hline}
+{res}inc_fd_pf_insu{right:INCOME_OF_MEMBER_FROM_FD_PF_INSURANCE}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}long{txt})
+
+{col 18}range:  [{res}0{txt},{res}450000{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}132{col 51}{txt}missing .:  {res}2,662,679{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 13.8292
+{txt}{col 15}std. dev:{res}{col 26} 1073.82
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}occupation{right:OCCUPATION}
+{txt}{hline}
+
+{col 19}type:  string ({res}strL{txt})
+
+{col 10}unique values:  {res}218{col 51}{txt}missing "":  {res}2,899,382{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}""
+{col 26}""
+{col 26}""
+{col 26}"Home Makers"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}reason_for_emigration_immigratio{right:REASON_FOR_EMIGRATION_IMMIGRATION}
+{txt}{hline}
+
+{col 19}type:  string ({res}str47{txt}), but longest is str14
+
+{col 10}unique values:  {res}1{col 51}{txt}missing "":  {res}3,155,177{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,155,177{col 33}""
+{col 21} 1,420,366{col 33}"Not Applicable"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}marital_status{right:MARITAL_STATUS}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt})
+
+{col 10}unique values:  {res}5{col 51}{txt}missing "":  {res}3,684,540{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,684,540{col 33}""
+{col 21}     2,843{col 33}"Divorced/Separated"
+{col 21}   698,607{col 33}"Married"
+{col 21}   100,066{col 33}"Not Applicable"
+{col 21}    61,322{col 33}"Unmarried"
+{col 21}    28,165{col 33}"Widowed"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}wave_no{right:WAVE_NO}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}1{txt},{res}18{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}18{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 9.55591
+{txt}{col 15}std. dev:{res}{col 26} 5.23064
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       2{col 37}       5{col 47}      10{col 57}      14{col 67}      17
+
+{txt}{hline}
+{res}state{right:STATE}
+{txt}{hline}
+
+{col 19}type:  string ({res}str16{txt})
+
+{col 10}unique values:  {res}26{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Haryana"
+{col 26}"Maharashtra"
+{col 26}"Rajasthan"
+{col 26}"Uttar Pradesh"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}hr{right:HR}
+{txt}{hline}
+
+{col 19}type:  string ({res}str6{txt})
+
+{col 10}unique values:  {res}95{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"HR 22"
+{col 26}"HR 40"
+{col 26}"HR 58"
+{col 26}"HR 8"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}district{right:DISTRICT}
+{txt}{hline}
+
+{col 19}type:  string ({res}str39{txt})
+
+{col 10}unique values:  {res}484{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"Chikkaballapura"
+{col 26}"Jalandhar"
+{col 26}"Moradabad"
+{col 26}"Rohtak"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}region_type{right:REGION_TYPE}
+{txt}{hline}
+
+{col 19}type:  string ({res}str5{txt})
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,578,335{col 33}"RURAL"
+{col 21} 2,997,208{col 33}"URBAN"
+
+{txt}{hline}
+{res}stratum{right:STRATUM}
+{txt}{hline}
+
+{col 19}type:  string ({res}str15{txt})
+
+{col 10}unique values:  {res}353{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"HR 23_RURAL_R"
+{col 26}"HR 40_URBAN_S"
+{col 26}"HR 59_URBAN_S"
+{col 26}"HR 81_RURAL_R"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}psu_id{right:PSU_ID}
+{txt}{hline}
+
+{col 19}type:  string ({res}str12{txt})
+
+{col 10}unique values:  {res}4,164{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"PSU_ID_1329"
+{col 26}"PSU_ID_2761"
+{col 26}"PSU_ID_5608"
+{col 26}"PSU_ID_8105"
+
+{txt}{hline}
+{res}response_status{right:RESPONSE_STATUS}
+{txt}{hline}
+
+{col 19}type:  string ({res}str12{txt}), but longest is str8
+
+{col 10}unique values:  {res}1{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,575,543{col 33}"Accepted"
+
+{txt}{hline}
+{res}reason_for_non_response{right:REASON_FOR_NON_RESPONSE}
+{txt}{hline}
+
+{col 19}type:  string ({res}str21{txt}), but longest is str10
+
+{col 10}unique values:  {res}1{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,575,543{col 33}"No Failure"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}mem_weight_w{right:MEM_WEIGHT_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}81.08168{txt},{res}14612.216{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,201{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1961.15
+{txt}{col 15}std. dev:{res}{col 26} 1995.16
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 304.864{col 37} 552.355{col 47} 1059.64{col 57}  2983.9{col 67} 4892.27
+
+{txt}{hline}
+{res}mem_weight_for_country_w{right:MEM_WEIGHT_FOR_COUNTRY_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}81.08168{txt},{res}14612.216{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,201{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}  2010.3
+{txt}{col 15}std. dev:{res}{col 26} 2033.01
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 313.607{col 37}  574.69{col 47} 1092.41{col 57} 3010.81{col 67} 5017.55
+
+{txt}{hline}
+{res}mem_weight_for_state_w{right:MEM_WEIGHT_FOR_STATE_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}81.08168{txt},{res}14612.216{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,201{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1981.16
+{txt}{col 15}std. dev:{res}{col 26} 1996.74
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 310.079{col 37} 567.364{col 47} 1080.35{col 57} 3039.24{col 67} 4892.27
+
+{txt}{hline}
+{res}ge15_mem_weight_w{right:GE15_MEM_WEIGHT_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}75.716187{txt},{res}13499.461{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,201{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1813.97
+{txt}{col 15}std. dev:{res}{col 26} 1818.22
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 286.647{col 37} 522.756{col 47} 988.288{col 57} 2768.82{col 67} 4435.12
+
+{txt}{hline}
+{res}ge15_mem_weight_for_country_w{right:GE15_MEM_WEIGHT_FOR_COUNTRY_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}75.716187{txt},{res}13499.461{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,201{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1859.18
+{txt}{col 15}std. dev:{res}{col 26} 1852.98
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 291.209{col 37} 540.318{col 47} 1029.14{col 57} 2803.18{col 67} 4595.39
+
+{txt}{hline}
+{res}ge15_mem_weight_for_state_w{right:GE15_MEM_WEIGHT_FOR_STATE_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}75.716187{txt},{res}13499.461{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,201{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1832.37
+{txt}{col 15}std. dev:{res}{col 26} 1819.67
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 289.589{col 37} 534.851{col 47} 1014.36{col 57} 2815.95{col 67} 4435.12
+
+{txt}{hline}
+{res}mem_non_response_w{right:MEM_NON_RESPONSE_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}301.79999{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,045{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1.18654
+{txt}{col 15}std. dev:{res}{col 26} .328043
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 1.03469{col 37} 1.07317{col 47} 1.14217{col 57} 1.24409{col 67} 1.37318
+
+{txt}{hline}
+{res}mem_non_response_for_country_w{right:MEM_NON_RESPONSE_FOR_COUNTRY_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}301.79999{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,045{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1.18715
+{txt}{col 15}std. dev:{res}{col 26} .355065
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 1.03469{col 37} 1.07334{col 47} 1.14217{col 57} 1.24415{col 67} 1.37342
+
+{txt}{hline}
+{res}mem_non_response_for_state_w{right:MEM_NON_RESPONSE_FOR_STATE_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}301.79999{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,045{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1.18714
+{txt}{col 15}std. dev:{res}{col 26} .355025
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 1.03469{col 37} 1.07317{col 47} 1.14217{col 57} 1.24415{col 67} 1.37351
+
+{txt}{hline}
+{res}ge15_mem_non_response_w{right:GE15_MEM_NON_RESPONSE_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}260.60001{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,015{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1.18342
+{txt}{col 15}std. dev:{res}{col 26} .308364
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 1.03367{col 37} 1.07272{col 47} 1.14039{col 57} 1.24117{col 67} 1.36557
+
+{txt}{hline}
+{res}ge15_mem_non_response_for_countr{right:GE15_MEM_NON_RESPONSE_FOR_COUNTRY_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}260.60001{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,015{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}   1.184
+{txt}{col 15}std. dev:{res}{col 26}  .33308
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 1.03367{col 37} 1.07275{col 47} 1.14041{col 57} 1.24117{col 67}  1.3664
+
+{txt}{hline}
+{res}ge15_mem_non_response_for_state_{right:GE15_MEM_NON_RESPONSE_FOR_STATE_W}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}260.60001{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}6,015{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}   1.184
+{txt}{col 15}std. dev:{res}{col 26} .333056
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27} 1.03367{col 37} 1.07272{col 47} 1.14039{col 57} 1.24117{col 67} 1.36648
+
+{txt}{hline}
+{res}member_status{right:MEMBER_STATUS}
+{txt}{hline}
+
+{col 19}type:  string ({res}str27{txt}), but longest is str23
+
+{col 10}unique values:  {res}1{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,575,543{col 33}"Member of the household"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}is_healthy{right:IS_HEALTHY}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str1
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}    92,439{col 33}"N"
+{col 21} 4,483,104{col 33}"Y"
+
+{txt}{hline}
+{res}is_on_regular_medication{right:IS_ON_REGULAR_MEDICATION}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str1
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,422,052{col 33}"N"
+{col 21}   153,491{col 33}"Y"
+
+{txt}{hline}
+{res}is_hospitalised{right:IS_HOSPITALISED}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str1
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,572,230{col 33}"N"
+{col 21}     3,313{col 33}"Y"
+
+{txt}{hline}
+{res}has_bank_ac{right:HAS_BANK_AC}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str2
+
+{col 10}unique values:  {res}3{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}        59{col 33}"DK"
+{col 21}   691,619{col 33}"N"
+{col 21} 3,883,865{col 33}"Y"
+
+{txt}{hline}
+{res}has_creditcard{right:HAS_CREDITCARD}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str14
+
+{col 10}unique values:  {res}4{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}       230{col 33}"DK"
+{col 21} 4,433,897{col 33}"N"
+{col 21}    22,625{col 33}"Not Applicable"
+{col 21}   118,791{col 33}"Y"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}has_kisan_creditcard{right:HAS_KISAN_CREDITCARD}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str14
+
+{col 10}unique values:  {res}4{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}       126{col 33}"DK"
+{col 21} 4,462,676{col 33}"N"
+{col 21}    22,625{col 33}"Not Applicable"
+{col 21}    90,116{col 33}"Y"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}has_demat_ac{right:HAS_DEMAT_AC}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str2
+
+{col 10}unique values:  {res}3{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}     2,214{col 33}"DK"
+{col 21} 4,551,399{col 33}"N"
+{col 21}    21,930{col 33}"Y"
+
+{txt}{hline}
+{res}has_pf_ac{right:HAS_PF_AC}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str2
+
+{col 10}unique values:  {res}3{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}       153{col 33}"DK"
+{col 21} 4,158,706{col 33}"N"
+{col 21}   416,684{col 33}"Y"
+
+{txt}{hline}
+{res}has_lic{right:HAS_LIC}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str2
+
+{col 10}unique values:  {res}3{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}       248{col 33}"DK"
+{col 21} 2,715,715{col 33}"N"
+{col 21} 1,859,580{col 33}"Y"
+
+{txt}{hline}
+{res}has_health_insurance{right:HAS_HEALTH_INSURANCE}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str2
+
+{col 10}unique values:  {res}3{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}       157{col 33}"DK"
+{col 21} 4,066,143{col 33}"N"
+{col 21}   509,243{col 33}"Y"
+
+{txt}{hline}
+{res}has_mobile{right:HAS_MOBILE}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str1
+
+{col 10}unique values:  {res}2{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,390,680{col 33}"N"
+{col 21} 3,184,863{col 33}"Y"
+
+{txt}{hline}
+{res}employment_status{right:EMPLOYMENT_STATUS}
+{txt}{hline}
+
+{col 19}type:  string ({res}str49{txt})
+
+{col 10}unique values:  {res}4{col 51}{txt}missing "":  {res}1,539,018{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,539,018{col 33}""
+{col 21} 1,628,511{col 33}"Employed"
+{col 21} 1,340,913{col 33}"Unemployed, not willing and not looking
+{col 33}for a job"
+{col 21}    32,323{col 33}"Unemployed, willing and looking for a
+{col 33}job"
+{col 21}    34,778{col 33}"Unemployed, willing but not looking for
+{col 33}a job"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}employment_status_since_yrs{right:EMPLOYMENT_STATUS_SINCE_YRS}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}-100{txt},{res}62{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}64{col 51}{txt}missing .:  {res}2,031,780{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 22.2945
+{txt}{col 15}std. dev:{res}{col 26} 18.3299
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       5{col 37}      12{col 47}      22{col 57}      32{col 67}      43
+
+{txt}{hline}
+{res}employment_status_since_mths{right:EMPLOYMENT_STATUS_SINCE_MTHS}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}-100{txt},{res}12{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}14{col 51}{txt}missing .:  {res}2,031,780{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}-87.4344
+{txt}{col 15}std. dev:{res}{col 26} 34.0403
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}    -100{col 37}    -100{col 47}    -100{col 57}    -100{col 67}       2
+
+{txt}{hline}
+{res}employment_status_since_days{right:EMPLOYMENT_STATUS_SINCE_DAYS}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}-100{txt},{res}31{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}33{col 51}{txt}missing .:  {res}2,031,780{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}-95.4475
+{txt}{col 15}std. dev:{res}{col 26} 21.7233
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}    -100{col 37}    -100{col 47}    -100{col 57}    -100{col 67}    -100
+
+{txt}{hline}
+{res}type_of_employment{right:TYPE_OF_EMPLOYMENT}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str14
+
+{col 10}unique values:  {res}3{col 51}{txt}missing "":  {res}2,516,971{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,516,971{col 33}""
+{col 21} 1,092,822{col 33}"Full-time"
+{col 21}   956,304{col 33}"Not Applicable"
+{col 21}     9,446{col 33}"Part-time"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}employment_arrangement{right:EMPLOYMENT_ARRANGEMENT}
+{txt}{hline}
+
+{col 19}type:  string ({res}str32{txt})
+
+{col 10}unique values:  {res}5{col 51}{txt}missing "":  {res}2,516,971{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,516,971{col 33}""
+{col 21}   293,290{col 33}"Daily Wage worker/ Casual labour"
+{col 21}   956,304{col 33}"Not Applicable"
+{col 21}   186,975{col 33}"Salaried - Permanent"
+{col 21}   129,624{col 33}"Salaried - Temporary"
+{col 21}   492,379{col 33}"Self-employed"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}place_of_work{right:PLACE_OF_WORK}
+{txt}{hline}
+
+{col 19}type:  string ({res}str39{txt})
+
+{col 10}unique values:  {res}16{col 51}{txt}missing "":  {res}2,516,971{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}""
+{col 26}""
+{col 26}"Government"
+{col 26}"Not Applicable"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}time_to_start_working{right:TIME_TO_START_WORKING}
+{txt}{hline}
+
+{col 19}type:  string ({res}str18{txt}), but longest is str17
+
+{col 10}unique values:  {res}9{col 51}{txt}missing "":  {res}2,516,971{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,516,971{col 33}""
+{col 21}     2,671{col 33}"12 months"
+{col 21}     1,342{col 33}"18 months"
+{col 21}    31,419{col 33}"24 months or more"
+{col 21}     2,606{col 33}"3 months"
+{col 21}     1,115{col 33}"6 months"
+{col 21}       909{col 33}"9 months"
+{col 21}   264,970{col 33}"Don't Know"
+{col 21}   634,668{col 33}"Never"
+{col 21} 1,118,872{col 33}"Not Applicable"
+
+{txt}{col 16}warning:  variable has embedded blanks
+
+{txt}{hline}
+{res}time_spent_on_work_for_hh_and_me{right:TIME_SPENT_ON_WORK_FOR_HH_AND_MEM}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}16{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}33{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 3.86984
+{txt}{col 15}std. dev:{res}{col 26} 2.75365
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       1{col 37}     1.5{col 47}       3{col 57}       6{col 67}       8
+
+{txt}{hline}
+{res}time_spent_on_work_for_employer{right:TIME_SPENT_ON_WORK_FOR_EMPLOYER}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}-100{txt},{res}15{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}31{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}-42.8351
+{txt}{col 15}std. dev:{res}{col 26} 53.9393
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}    -100{col 37}    -100{col 47}       6{col 57}       8{col 67}       9
+
+{txt}{hline}
+{res}time_spent_on_work_as_unpaid_tra{right:TIME_SPENT_ON_WORK_AS_UNPAID_TRAINEE}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}9{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}15{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .026671
+{txt}{col 15}std. dev:{res}{col 26} .181823
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}time_spent_on_work_as_unpaid_vol{right:TIME_SPENT_ON_WORK_AS_UNPAID_VOLUNTEER}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}10{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}15{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}  .04621
+{txt}{col 15}std. dev:{res}{col 26} .221971
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}time_spent_on_travel{right:TIME_SPENT_ON_TRAVEL}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}9{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}18{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .638311
+{txt}{col 15}std. dev:{res}{col 26} .595853
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}      .5{col 57}       1{col 67}     1.5
+
+{txt}{hline}
+{res}time_spent_on_learning{right:TIME_SPENT_ON_LEARNING}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}9{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}19{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .082318
+{txt}{col 15}std. dev:{res}{col 26} .338142
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}time_spent_on_religious_activiti{right:TIME_SPENT_ON_RELIGIOUS_ACTIVITIES}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}8{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}14{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .631723
+{txt}{col 15}std. dev:{res}{col 26} .521188
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}      .5{col 47}      .5{col 57}       1{col 67}       1
+
+{txt}{hline}
+{res}time_spent_on_outdoor_sports{right:TIME_SPENT_ON_OUTDOOR_SPORTS}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}6{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}13{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .110587
+{txt}{col 15}std. dev:{res}{col 26} .393686
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}      .5
+
+{txt}{hline}
+{res}time_spent_on_hanging_out_or_wit{right:TIME_SPENT_ON_HANGING_OUT_OR_WITH_FRIENDS}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}9{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}19{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1.34399
+{txt}{col 15}std. dev:{res}{col 26} .960709
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       1{col 47}       1{col 57}       2{col 67}     2.5
+
+{txt}{hline}
+{res}time_spent_on_indoor_entertainme{right:TIME_SPENT_ON_INDOOR_ENTERTAINMENT}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}12{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}20{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 2.02853
+{txt}{col 15}std. dev:{res}{col 26} 1.24973
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}      .5{col 37}       1{col 47}       2{col 57}       3{col 67}       4
+
+{txt}{hline}
+{res}time_spent_on_other_activities_f{right:TIME_SPENT_ON_OTHER_ACTIVITIES_FOR_SELF}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}24{txt}]{col 55}units:  {res}.1
+{col 10}{txt}unique values:  {res}49{col 51}{txt}missing .:  {res}4,312,958{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 10.9648
+{txt}{col 15}std. dev:{res}{col 26} 2.82814
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       8{col 37}       9{col 47}    10.5{col 57}    12.5{col 67}      15
+
+{txt}{hline}
+{res}date{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric daily date ({res}float{txt})
+
+{col 18}range:  [{res}19755{txt},{res}21884{txt}]{col 55}units:  {res}1
+{col 8}{txt}or equivalently:  [{res}01feb2014{txt},{res}01dec2019{txt}]{col 55}units:  {res}days
+{col 10}{txt}unique values:  {res}71{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 20811.8{txt} = {res}23dec2016{txt} (+ 19 hours)
+{col 15}std. dev:{res}{col 26} 636.366
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}   19936{col 37}   20240{col 47}   20820{col 57}   21366{col 67}   21701
+{col 26}01aug2014{col 36}01jun2015{col 46}01jan2017{col 56}01jul2018{col 66}01jun2019
+
+{txt}{hline}
+{res}date_str{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  string ({res}str6{txt})
+
+{col 10}unique values:  {res}71{col 51}{txt}missing "":  {res}0{txt}/{res}4,575,543
+
+{txt}{col 15}examples:  {res}"201503"
+{col 26}"201605"
+{col 26}"201708"
+{col 26}"201811"
+
+{txt}{hline}
+{res}mean_inc_all_source{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}2250000{txt}]{col 55}units:  {res}1.000e-07
+{col 10}{txt}unique values:  {res}22,737{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 5632.45
+{txt}{col 15}std. dev:{res}{col 26} 9676.24
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}    8125{col 67}   15000
+
+{txt}{hline}
+{res}mean_inc_wages{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}2250000{txt}]{col 55}units:  {res}1.000e-07
+{col 10}{txt}unique values:  {res}17,622{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 5608.59
+{txt}{col 15}std. dev:{res}{col 26} 9651.29
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}    8100{col 67}   15000
+
+{txt}{hline}
+{res}mean_inc_pension{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}112500{txt}]{col 55}units:  {res}.0001
+{col 10}{txt}unique values:  {res}377{col 51}{txt}missing .:  {res}287,841{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 14.4026
+{txt}{col 15}std. dev:{res}{col 26}  437.75
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}mean_inc_dividend{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}125000{txt}]{col 55}units:  {res}.00001
+{col 10}{txt}unique values:  {res}202{col 51}{txt}missing .:  {res}287,841{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 1.26329
+{txt}{col 15}std. dev:{res}{col 26} 174.863
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}mean_inc_interest{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}75000{txt}]{col 55}units:  {res}1.000e-06
+{col 10}{txt}unique values:  {res}781{col 51}{txt}missing .:  {res}287,841{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26}  3.2985
+{txt}{col 15}std. dev:{res}{col 26}  129.83
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}mean_inc_fd_pf_insu{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}225000{txt}]{col 55}units:  {res}.01
+{col 10}{txt}unique values:  {res}219{col 51}{txt}missing .:  {res}2,573,822{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 13.9177
+{txt}{col 15}std. dev:{res}{col 26} 585.389
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       0{col 57}       0{col 67}       0
+
+{txt}{hline}
+{res}id_state{right:group(state)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}26{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}26{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 15.5851
+{txt}{col 15}std. dev:{res}{col 26} 7.33982
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       4{col 37}      11{col 47}      14{col 57}      22{col 67}      24
+
+{txt}{hline}
+{res}id_hr{right:group(hr)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}95{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}95{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 49.3409
+{txt}{col 15}std. dev:{res}{col 26} 26.6312
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}      13{col 37}      26{col 47}      49{col 57}      72{col 67}      85
+
+{txt}{hline}
+{res}id_dist{right:group(district)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}484{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}484{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 237.768
+{txt}{col 15}std. dev:{res}{col 26} 139.231
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}      43{col 37}     126{col 47}     241{col 57}     352{col 67}     439
+
+{txt}{hline}
+{res}period{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}18{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}18{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 6.93183
+{txt}{col 15}std. dev:{res}{col 26}  4.5577
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       1{col 37}       3{col 47}       6{col 57}      10{col 67}      14
+
+{txt}{hline}
+{res}nature_1{right:nature==Agricultural Labourer}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,421,108{col 33}0
+{col 21}   154,435{col 33}1
+
+{txt}{hline}
+{res}nature_business{right:nature==Businessman}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,346,430{col 33}0
+{col 21}   229,113{col 33}1
+
+{txt}{hline}
+{res}nature_3{right:nature==Home Maker}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,503,592{col 33}0
+{col 21} 2,071,951{col 33}1
+
+{txt}{hline}
+{res}nature_4{right:nature==Home-based Worker}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,544,176{col 33}0
+{col 21}    31,367{col 33}1
+
+{txt}{hline}
+{res}nature_industrialw{right:nature==Industrial Workers}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,431,584{col 33}0
+{col 21}   143,959{col 33}1
+
+{txt}{hline}
+{res}nature_6{right:nature==Legislator/Social Worker/ Activists}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,573,794{col 33}0
+{col 21}     1,749{col 33}1
+
+{txt}{hline}
+{res}nature_7{right:nature==Manager}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,565,505{col 33}0
+{col 21}    10,038{col 33}1
+
+{txt}{hline}
+{res}nature_8{right:nature==Non-Industrial Technical Employee}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,515,210{col 33}0
+{col 21}    60,333{col 33}1
+
+{txt}{hline}
+{res}nature_9{right:nature==Organised Farmer}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,458,237{col 33}0
+{col 21}   117,306{col 33}1
+
+{txt}{hline}
+{res}nature_qualified{right:nature==Qualified Self Employed Professionals}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,561,590{col 33}0
+{col 21}    13,953{col 33}1
+
+{txt}{hline}
+{res}nature_11{right:nature==Self Employed Entrepreneur}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,306,662{col 33}0
+{col 21}   268,881{col 33}1
+
+{txt}{hline}
+{res}nature_self{right:nature==Self employed professional}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,557,360{col 33}0
+{col 21}    18,183{col 33}1
+
+{txt}{hline}
+{res}nature_13{right:nature==Small Farmer}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,349,551{col 33}0
+{col 21}   225,992{col 33}1
+
+{txt}{hline}
+{res}nature_small{right:nature==Small Trader/Hawker/ Businessman without Fixed Premises}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,478,900{col 33}0
+{col 21}    96,643{col 33}1
+
+{txt}{hline}
+{res}nature_15{right:nature==Support Staff}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,332,481{col 33}0
+{col 21}   243,062{col 33}1
+
+{txt}{hline}
+{res}nature_16{right:nature==Unoccupied}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,555,358{col 33}0
+{col 21}    20,185{col 33}1
+
+{txt}{hline}
+{res}nature_unoccupied{right:nature==Wage Labourer}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,992,699{col 33}0
+{col 21}   582,844{col 33}1
+
+{txt}{hline}
+{res}nature_wage{right:nature==White Collar Clerical Employees}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,453,316{col 33}0
+{col 21}   122,227{col 33}1
+
+{txt}{hline}
+{res}nature_19{right:nature==White collar worker}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,538,027{col 33}0
+{col 21}    37,516{col 33}1
+
+{txt}{hline}
+{res}nature_20{right:nature==White-Collar Professional Employees and Other Employees}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,449,737{col 33}0
+{col 21}   125,806{col 33}1
+
+{txt}{hline}
+{res}inds_agriculture{right:inds==Agriculture- allied activities}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,177,688{col 33}0
+{col 21}     3,372{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_auto{right:inds==Automobiles and Other Transport Equipment Manufacturers}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,160,738{col 33}0
+{col 21}    20,322{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{p 0 39}{res}inds_construction{space 22}inds==Cement, Tiles, Bricks, Ceramics, Glass and other construction materials{p_end}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,132,934{col 33}0
+{col 21}    48,126{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_chemical{right:inds==Chemical Industries}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,160,604{col 33}0
+{col 21}    20,456{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_cropcultiv{right:inds==Crop Cultivation}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,780,602{col 33}0
+{col 21}   400,458{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_fishing{right:inds==Fishing}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,176,021{col 33}0
+{col 21}     5,039{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_foodinds{right:inds==Food Industries}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,133,264{col 33}0
+{col 21}    47,796{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_leather{right:inds==Footwear and other Leather Industries}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,169,174{col 33}0
+{col 21}    11,886{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_forestry{right:inds==Forestry including Wood Cutting}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,180,164{col 33}0
+{col 21}       896{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_fruitveg{right:inds==Fruits and Vegetable Farming}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,145,668{col 33}0
+{col 21}    35,392{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_machinery{right:inds==Machinery Manufacturers}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,147,555{col 33}0
+{col 21}    33,505{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_metal{right:inds==Metal Industries}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,131,056{col 33}0
+{col 21}    50,004{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_mines{right:inds==Mines}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,169,532{col 33}0
+{col 21}    11,528{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_notapplicable{right:inds==Not Applicable}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,208,061{col 33}0
+{col 21} 1,972,999{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_pharma{right:inds==Pharmaceutical Manufacturer}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,173,644{col 33}0
+{col 21}     7,416{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_plantationcrop{right:inds==Plantation Crop Cultivation}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,177,940{col 33}0
+{col 21}     3,120{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_poultry{right:inds==Poultry Farming, Animal Husbandry and Vermiculture}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,170,427{col 33}0
+{col 21}    10,633{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_soap{right:inds==Soaps, Detergents, Cosmetics, Toiletries}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,173,870{col 33}0
+{col 21}     7,190{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_textile{right:inds==Textile Industries}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,104,423{col 33}0
+{col 21}    76,637{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_utilities{right:inds==Utilities}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}byte{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}394,483{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,164,501{col 33}0
+{col 21}    16,559{col 33}1
+{col 21}   394,483{col 33}.
+
+{txt}{hline}
+{res}inds_all_factories{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}1,972,999{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,329,210{col 33}0
+{col 21}   273,334{col 33}1
+{col 21} 1,972,999{col 33}.
+
+{txt}{hline}
+{res}inds_all_plantation{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}1,972,999{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,143,634{col 33}0
+{col 21}   458,910{col 33}1
+{col 21} 1,972,999{col 33}.
+
+{txt}{hline}
+{res}inds_all_mining{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}1,972,999{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 2,524,453{col 33}0
+{col 21}    78,091{col 33}1
+{col 21} 1,972,999{col 33}.
+
+{txt}{hline}
+{res}inds_relevant{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}1,972,999{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,792,209{col 33}0
+{col 21}   810,335{col 33}1
+{col 21} 1,972,999{col 33}.
+
+{txt}{hline}
+{res}inds_notrelevant{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}1,972,999{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}   810,335{col 33}0
+{col 21} 1,792,209{col 33}1
+{col 21} 1,972,999{col 33}.
+
+{txt}{hline}
+{res}reformed{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,908,865{col 33}0
+{col 21}   666,678{col 33}1
+
+{txt}{hline}
+{res}state_ever_treated{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}1{col 51}{txt}missing .:  {res}2,971,540{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,604,003{col 33}1
+{col 21} 2,971,540{col 33}.
+
+{txt}{hline}
+{res}reformed_ever{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,448,389{col 33}0
+{col 21} 1,127,154{col 33}1
+
+{txt}{hline}
+{res}temp_last_reformed{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}489,024{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,521,374{col 33}0
+{col 21}   565,145{col 33}1
+{col 21}   489,024{col 33}.
+
+{txt}{hline}
+{res}temp_last_reformed_equal{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,497,083{col 33}0
+{col 21}    78,460{col 33}1
+
+{txt}{hline}
+{res}temp_reformed_changetwice{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 3,558,122{col 33}0
+{col 21} 1,017,421{col 33}1
+
+{txt}{hline}
+{res}reformed_changetwice{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}0{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}1{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,575,543{col 33}0
+
+{txt}{hline}
+{res}reformedxinds{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,459,539{col 33}0
+{col 21}   116,004{col 33}1
+
+{txt}{hline}
+{res}reformedxinds_f{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,549,622{col 33}0
+{col 21}    25,921{col 33}1
+
+{txt}{hline}
+{res}reformedxinds_m{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,567,121{col 33}0
+{col 21}     8,422{col 33}1
+
+{txt}{hline}
+{res}reformedxinds_p{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 4,493,882{col 33}0
+{col 21}    81,661{col 33}1
+
+{txt}{hline}
+{res}inds_reframe{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}-1{txt},{res}3{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}5{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,972,999{col 33}-1
+{col 21} 1,792,209{col 33}0
+{col 21}   273,334{col 33}1
+{col 21}    78,091{col 33}2
+{col 21}   458,910{col 33}3
+
+{txt}{hline}
+{res}emp_dist_date_total{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}1{txt},{res}2936{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}1,325{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 666.373
+{txt}{col 15}std. dev:{res}{col 26} 356.232
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}     201{col 37}     441{col 47}     650{col 57}     856{col 67}    1085
+
+{txt}{hline}
+{res}emp_dist_date_plantation{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}450{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}332{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 55.1846
+{txt}{col 15}std. dev:{res}{col 26}  68.897
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       4{col 47}      32{col 57}      80{col 67}     142
+
+{txt}{hline}
+{res}share_dist_date_plantation{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}.92105263{txt}]{col 55}units:  {res}1.000e-11
+{col 10}{txt}unique values:  {res}6,805{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .100296
+{txt}{col 15}std. dev:{res}{col 26} .125763
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37} .007062{col 47}   .0553{col 57} .139896{col 67} .275081
+
+{txt}{hline}
+{res}emp_dist_date_factories{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}334{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}240{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 40.0091
+{txt}{col 15}std. dev:{res}{col 26} 50.4112
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       3{col 47}      20{col 57}      59{col 67}     111
+
+{txt}{hline}
+{res}share_dist_date_factories{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}.78947371{txt}]{col 55}units:  {res}1.000e-10
+{col 10}{txt}unique values:  {res}5,626{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .059738
+{txt}{col 15}std. dev:{res}{col 26} .069179
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37} .006886{col 47} .036624{col 57} .090361{col 67} .148241
+
+{txt}{hline}
+{res}emp_dist_date_mining{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}235{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}155{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 12.3005
+{txt}{col 15}std. dev:{res}{col 26} 24.6534
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47}       4{col 57}      13{col 67}      32
+
+{txt}{hline}
+{res}share_dist_date_mining{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}.34794521{txt}]{col 55}units:  {res}1.000e-11
+{col 10}{txt}unique values:  {res}3,823{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .017067
+{txt}{col 15}std. dev:{res}{col 26} .030693
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}       0{col 47} .006494{col 57} .019608{col 67} .043833
+
+{txt}{hline}
+{res}emp_state_date_total{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}60{txt},{res}12778{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}1,367{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 4894.02
+{txt}{col 15}std. dev:{res}{col 26} 2916.95
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}    1705{col 37}    2915{col 47}    4059{col 57}    7473{col 67}    9519
+
+{txt}{hline}
+{res}emp_state_date_plantation{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1747{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}646{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 499.239
+{txt}{col 15}std. dev:{res}{col 26}   414.7
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}     180{col 47}     426{col 57}     722{col 67}    1186
+
+{txt}{hline}
+{res}share_state_date_plantation{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}.41552106{txt}]{col 55}units:  {res}1.000e-10
+{col 10}{txt}unique values:  {res}1,437{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .100296
+{txt}{col 15}std. dev:{res}{col 26} .062044
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37} .060725{col 47}  .09943{col 57} .141551{col 67}  .17885
+
+{txt}{hline}
+{res}emp_state_date_factories{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1744{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}494{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 301.487
+{txt}{col 15}std. dev:{res}{col 26} 323.306
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}      54{col 47}     203{col 57}     471{col 67}     642
+
+{txt}{hline}
+{res}share_state_date_factories{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}.34824282{txt}]{col 55}units:  {res}1.000e-10
+{col 10}{txt}unique values:  {res}1,481{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .059738
+{txt}{col 15}std. dev:{res}{col 26} .048073
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37} .023463{col 47} .053844{col 57}  .08237{col 67} .129088
+
+{txt}{hline}
+{res}emp_state_date_mining{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}513{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}215{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} 74.7487
+{txt}{col 15}std. dev:{res}{col 26} 69.0495
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37}      16{col 47}      62{col 57}     118{col 67}     169
+
+{txt}{hline}
+{res}share_state_date_mining{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}.16206589{txt}]{col 55}units:  {res}1.000e-11
+{col 10}{txt}unique values:  {res}1,411{col 51}{txt}missing .:  {res}0{txt}/{res}4,575,543
+
+{txt}{col 19}mean:{res}{col 26} .017067
+{txt}{col 15}std. dev:{res}{col 26} .017295
+
+{txt}{col 12}percentiles:{col 32}10%{col 42}25%{col 52}50%{col 62}75%{col 72}90%
+{res}{col 27}       0{col 37} .006548{col 47} .013679{col 57} .021886{col 67} .037245
+
+{txt}{hline}
+{res}inds_reframe_lag{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}-1{txt},{res}3{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}5{col 51}{txt}missing .:  {res}489,024{txt}/{res}4,575,543
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res} 1,752,416{col 33}-1
+{col 21} 1,610,528{col 33}0
+{col 21}   246,095{col 33}1
+{col 21}    70,139{col 33}2
+{col 21}   407,341{col 33}3
+{col 21}   489,024{col 33}.
+{txt}
+{com}. 
+. 
+. log close
+      {txt}name:  {res}<unnamed>
+       {txt}log:  {res}/storage/work/f/fxl146/Pyramids/IDA_summarystat.smcl
+  {txt}log type:  {res}smcl
+ {txt}closed on:  {res} 9 Feb 2022, 04:06:20
+{txt}{.-}
+{smcl}
+{txt}{sf}{ul off}

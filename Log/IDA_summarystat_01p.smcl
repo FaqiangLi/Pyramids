@@ -1,0 +1,1068 @@
+{smcl}
+{com}{sf}{ul off}{txt}{.-}
+      name:  {res}<unnamed>
+       {txt}log:  {res}/storage/work/f/fxl146/Pyramids/IDA_summarystat_01p.smcl
+  {txt}log type:  {res}smcl
+ {txt}opened on:  {res} 9 Feb 2022, 02:42:30
+{txt}
+{com}. 
+. 
+. * identifiers
+. // i : individual (a hh_id-mem-id)
+. // t : period (a month slot in the base dataset)
+. // s : state i lives in 
+. // d : district i lives in 
+. // hr: homogenous region i lives in 
+. 
+. * caveat
+. // Aspirational India and consumption data have not incorporated in. They are at the household levels. 
+. 
+. // note that people of india has every possible month because some households are asked in different month in a wave.
+. 
+. 
+. ********************************************************************************
+. *********** Sample selection **** 
+. ********************************************************************************
+. 
+. 
+. * Sample from people of India (see clean_trim_merge_append.do)
+. clear
+{txt}
+{com}. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+{res}/gpfs/scratch/fxl146/Pyramids_statafiles
+{txt}
+{com}. use concise_1419_labor_01p,replace
+{txt}
+{com}. 
+. * Drop the obs of two ambigous states, AP and Jharkhand&
+. drop if state == "Andhra Pradesh" | state == "Jharkhand"  // around 6%
+{txt}(1,980 observations deleted)
+
+{com}. 
+. * disaggregation level (income is at id-monthslot-month level)
+. duplicates report id month_slot month
+
+{p 0 4}{txt}Duplicates in terms of {res} id month_slot month{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}        {res}30422             0
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. duplicates report id month_slot 
+
+{p 0 4}{txt}Duplicates in terms of {res} id month_slot{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}        {res}30342             0
+        {txt}2 {c |}           {res}80            40
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. 
+. 
+. * reformat dates
+. gen date=date(month_slot, "MY")
+{txt}
+{com}. format date %d
+{txt}
+{com}. gen date_m = month(date)
+{txt}
+{com}. gen date_y = year(date)
+{txt}
+{com}. tostring date_m date_y, replace
+{txt}date_m was {res:float} now {res:str2}
+date_y was {res:float} now {res:str4}
+
+{com}. replace date_m = "0"+date_m if strlen(date_m)==1
+{txt}(22,695 real changes made)
+
+{com}. gen date_str = date_y + date_m
+{txt}
+{com}. 
+. destring date_m date_y,replace
+{txt}date_m: all characters numeric; {res}replaced {txt}as {res}byte
+{txt}date_y: all characters numeric; {res}replaced {txt}as {res}int
+{txt}
+{com}. rename month month_of_income_data
+{res}{txt}
+{com}. 
+. * Drop extra dates
+. drop if date_y>2019
+{txt}(1,007 observations deleted)
+
+{com}. 
+. * Now, use the mean income to match people of india time label
+. rename income_of_member_from_* inc_*
+{res}{txt}
+{com}. foreach var in inc_all_source inc_wages inc_pension inc_dividend inc_interest inc_fd_pf_insu{c -(}
+{txt}  2{com}.         bysort id date: egen mean_`var' = mean(`var')
+{txt}  3{com}. {c )-}
+{txt}(1,756 missing values generated)
+(1,756 missing values generated)
+(1,756 missing values generated)
+(16,481 missing values generated)
+
+{com}. duplicates report id date
+
+{p 0 4}{txt}Duplicates in terms of {res} id date{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}        {res}29337             0
+        {txt}2 {c |}           {res}78            39
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. bysort id date: keep if _n==1
+{txt}(39 observations deleted)
+
+{com}. 
+. 
+. * Drop students, and retired observation
+. **** CAVEAT: this needs more careful treatment in the future because status of student, homemaker and retired observation is a dynamic ones.
+. **** in this version, I drop ever-students and ever-retired
+. gen temp_student = 1 if nature_of_occupation=="Student"
+{txt}(24,379 missing values generated)
+
+{com}. bysort id (date_y date_m): egen temp_ever_student = sum(temp_student)
+{txt}
+{com}. gen temp_retired = 1 if nature_of_occupation=="Retired/Aged"
+{txt}(27,555 missing values generated)
+
+{com}. bysort id (date_y date_m): egen temp_ever_retired = sum(temp_retired)
+{txt}
+{com}. drop if temp_ever_retired>0 | temp_ever_student>0
+{txt}(6,887 observations deleted)
+
+{com}. drop temp_ever_retired temp_ever_student temp_student temp_retired
+{txt}
+{com}. // I don't drop home maker
+. 
+. * regenerate some id (after having done all the sample selection)
+. egen id_date = group(date_str)
+{txt}
+{com}. egen id_state = group(state)
+{txt}
+{com}. egen id_hr = group(hr)
+{txt}
+{com}. egen id_dist= group(district)
+{txt}
+{com}. 
+. * organize data
+. sort id hh_id mem_id date_y date_m id_date month_of_income
+{txt}
+{com}. order id hh_id mem_id date_y date_m id_date month_of_income
+{txt}
+{com}. 
+. 
+. ********************************************************************************
+. ***********  Variable construction
+. ********************************************************************************
+. 
+. 
+. * first observation of an individual
+. bysort id (id_date): gen period = _n
+{txt}
+{com}. 
+. * rename nature and industry
+. 
+. // occupation
+. rename nature_of_occupation nature
+{res}{txt}
+{com}. qui tab nature, generate(nature_)
+{txt}
+{com}. rename nature_2 nature_business
+{res}{txt}
+{com}. rename nature_5 nature_industrialw
+{res}{txt}
+{com}. rename nature_10 nature_qualified
+{res}{txt}
+{com}. rename nature_12 nature_self
+{res}{txt}
+{com}. rename nature_14 nature_small
+{res}{txt}
+{com}. rename nature_17 nature_unoccupied
+{res}{txt}
+{com}. rename nature_18 nature_wage
+{res}{txt}
+{com}. 
+. // industry
+. rename industry_of_occupation inds
+{res}{txt}
+{com}. qui tab inds, generate(inds)
+{txt}
+{com}. 
+. // not applicable
+. rename inds25 inds_notapplicable
+{res}{txt}
+{com}. 
+. ///////// check missing !! do this later!!!!
+> 
+. // factories
+. rename inds2 inds_auto
+{res}{txt}
+{com}. rename inds3 inds_construction
+{res}{txt}
+{com}. rename inds4 inds_chemical
+{res}{txt}
+{com}. rename inds12 inds_foodinds
+{res}{txt}
+{com}. rename inds13 inds_leather
+{res}{txt}
+{com}. rename inds21 inds_machinery
+{res}{txt}
+{com}. rename inds28 inds_pharma
+{res}{txt}
+{com}. rename inds34 inds_soap
+{res}{txt}
+{com}. rename inds35 inds_textile
+{res}{txt}
+{com}. local inds_factory_type inds_auto inds_construction inds_chemical inds_foodinds inds_leather inds_machinery inds_pharma inds_soap inds_textile
+{txt}
+{com}. egen temp_inds_all_factories = rowtotal(`inds_factory_type')
+{txt}
+{com}. gen inds_all_factories = 1 if temp_inds_all_factories>0 & inds_notapplicable~=1
+{txt}(21,080 missing values generated)
+
+{com}. replace inds_all_factories = 0 if temp_inds_all_factories==0 & inds_notapplicable~=1
+{txt}(10,930 real changes made)
+
+{com}. drop temp_inds_all_factories
+{txt}
+{com}. 
+. // plantation
+. rename inds1 inds_agriculture
+{res}{txt}
+{com}. rename inds6 inds_cropcultiv
+{res}{txt}
+{com}. rename inds11 inds_fishing
+{res}{txt}
+{com}. rename inds14 inds_forestry
+{res}{txt}
+{com}. rename inds15 inds_fruitveg
+{res}{txt}
+{com}. rename inds29 inds_plantationcrop
+{res}{txt}
+{com}. rename inds30 inds_poultry
+{res}{txt}
+{com}. local inds_plantation_type inds_agriculture  inds_cropcultiv inds_fishing inds_forestry inds_fruitveg inds_plantationcrop inds_poultry
+{txt}
+{com}. egen temp_inds_all_plantation = rowtotal(`inds_plantation_type')
+{txt}
+{com}. gen inds_all_plantation = 1 if temp_inds_all_plantation>0 & inds_notapplicable~=1
+{txt}(20,248 missing values generated)
+
+{com}. replace inds_all_plantation = 0 if temp_inds_all_plantation==0 & inds_notapplicable~=1
+{txt}(10,098 real changes made)
+
+{com}. drop temp_inds_all_plantation
+{txt}
+{com}. 
+. // mining
+. rename inds23 inds_metal
+{res}{txt}
+{com}. rename inds24 inds_mines
+{res}{txt}
+{com}. rename inds37 inds_utilities
+{res}{txt}
+{com}. local inds_mining_type inds_metal inds_mines inds_utilities
+{txt}
+{com}. egen temp_inds_all_mining = rowtotal(`inds_mining_type')
+{txt}
+{com}. gen inds_all_mining = 1 if temp_inds_all_mining>0 & inds_notapplicable~=1
+{txt}(22,099 missing values generated)
+
+{com}. replace inds_all_mining = 0 if temp_inds_all_mining==0 & inds_notapplicable~=1
+{txt}(11,949 real changes made)
+
+{com}. drop temp_inds_all_mining
+{txt}
+{com}. 
+. // left out, to be used later
+. rename inds# inds_#_dropped
+{res}{txt}
+{com}. drop *_dropped
+{txt}
+{com}. // rename inds5 inds_communication
+. // rename inds7 inds_defence
+. // rename inds8 inds_education
+. // rename inds9 inds_entertainsport
+. // rename inds10 inds_finance
+. // rename inds16 inds_gemjewellery
+. // rename inds17 inds_handicraft
+. // rename inds18 inds_healthcare
+. // rename inds19 inds_hotelresturant
+. // rename inds20 inds_IT
+. // rename inds22 inds_mediapublishing
+. // rename inds26 inds_nonprofession
+. // rename inds27 inds_professional
+. // rename inds31 inds_publicadmin
+. // rename inds32 inds_realestate
+. // rename inds33 inds_retail
+. // rename inds36 inds_traveltourism
+. // rename inds38 inds_wholesale
+. 
+. // relevant industry for the study
+. gen inds_relevant = (inds_all_mining+inds_all_plantation+inds_all_factories)>0 if inds_notapplicable~=1
+{txt}(10,150 missing values generated)
+
+{com}. gen inds_notrelevant = 1 - inds_relevant
+{txt}(10,150 missing values generated)
+
+{com}. 
+. * Treatment status: treated if for i, IDA is informed in s(i) in t 
+. * CAVEAT: STATE OF ORIGIN IS NOT THE STATUS WE WANT
+. gen reformed = 0
+{txt}
+{com}. replace reformed = 1 if state == "Maharashtra" & ((date_m >= 11 & date_y == 2017) | date_y>2017 )
+{txt}(1,034 real changes made)
+
+{com}. replace reformed = 1 if state == "Rajasthan" & ( (date_m >= 11 & date_y==2014) | date_y>2014  )
+{txt}(1,315 real changes made)
+
+{com}. replace reformed = 1 if state == "Madhya Pradesh" &  ( (date_m >=11 & date_y==2017) | date_y>2017 )
+{txt}(492 real changes made)
+
+{com}. replace reformed = 1 if state == "Haryana" & ( (date_m >=3 & date_y==2016) | date_y>2016 )
+{txt}(543 real changes made)
+
+{com}. replace reformed = 1 if state == "Gujarat" &  ( (date_m >=9 & date_y==2020) | date_y>2020 )
+{txt}(0 real changes made)
+
+{com}. replace reformed = 1 if state == "Assam" &  ( (date_m >=9 & date_y==2017) | date_y>2017 )
+{txt}(68 real changes made)
+
+{com}. 
+. * treated states (this is a state level variable)
+. gen state_ever_treated = 1 if inlist(state,"Maharashtra","Rajasthan","Madhya Pradesh","Haryana","Gujarat","Assam")
+{txt}(14,510 missing values generated)
+
+{com}. 
+. * Ever-treated status of individual, if changed multiple times -- reflecting migration
+. bysort id : egen temp_ever_reformed = sum(reformed)
+{txt}
+{com}. gen reformed_ever = temp_ever_reformed>0
+{txt}
+{com}. drop temp_ever_reformed
+{txt}
+{com}. tab reformed_ever if period ==1 
+
+{txt}reformed_ev {c |}
+         er {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}     18,637       84.52       84.52
+{txt}          1 {c |}{res}      3,413       15.48      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     22,050      100.00
+{txt}
+{com}. 
+. * Change treatment status more than once: e.g. 0,0,1,1,0,0, 1=treated
+. bysort id (id_date): gen temp_last_reformed = reformed[_n-1]
+{txt}(22,050 missing values generated)
+
+{com}. gen temp_last_reformed_equal = reformed~=temp_last_reformed  if temp_last_reformed~=. // an one marks a change of reform status
+{txt}(22,050 missing values generated)
+
+{com}. replace temp_last_reformed_equal=0 if temp_last_reformed_equal==.
+{txt}(22,050 real changes made)
+
+{com}. bysort id  : egen temp_reformed_changetwice = sum(temp_last_reformed_equal)
+{txt}
+{com}. gen reformed_changetwice = 0 if temp_reformed_changetwice==0 | temp_reformed_changetwice==1
+{txt}
+{com}. replace reformed_changetwice = 1 if reformed_changetwice~=0
+{txt}(0 real changes made)
+
+{com}. 
+. tab reformed_changetwice
+
+{txt}reformed_ch {c |}
+  angetwice {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}     22,489      100.00      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     22,489      100.00
+{txt}
+{com}. 
+. * Reformed cross early affected industry (mine, planation,factory)
+. // replace missing for not applicable
+. gen reformedxinds = reformed*inds_relevant
+{txt}(10,150 missing values generated)
+
+{com}. replace reformedxinds = 0 if reformedxinds==.
+{txt}(10,150 real changes made)
+
+{com}. gen reformedxinds_f = reformed*inds_all_factories
+{txt}(10,150 missing values generated)
+
+{com}. replace reformedxinds_f = 0 if reformedxinds_f==.
+{txt}(10,150 real changes made)
+
+{com}. gen reformedxinds_m = reformed*inds_all_mining
+{txt}(10,150 missing values generated)
+
+{com}. replace reformedxinds_m = 0 if reformedxinds_m==.
+{txt}(10,150 real changes made)
+
+{com}. gen reformedxinds_p = reformed*inds_all_plantation
+{txt}(10,150 missing values generated)
+
+{com}. replace reformedxinds_p = 0 if reformedxinds_p==.
+{txt}(10,150 real changes made)
+
+{com}. 
+. * reframe the industry tags (there is no possibility of multiple industry)
+. gen inds_reframe = -1  // this almost equals home maker
+{txt}
+{com}. replace inds_reframe = 1 if inds_all_factories==1
+{txt}(1,409 real changes made)
+
+{com}. replace inds_reframe = 2 if inds_all_mining==1
+{txt}(390 real changes made)
+
+{com}. replace inds_reframe = 3 if inds_all_plantation==1
+{txt}(2,241 real changes made)
+
+{com}. replace inds_reframe = 0 if inds_notrelevant==1
+{txt}(8,299 real changes made)
+
+{com}. 
+. * District level industry composition 
+. bysort id_dist id_date: egen emp_dist_date_total = count(id)
+{txt}
+{com}. foreach type in plantation factories mining {c -(}
+{txt}  2{com}.         bysort id_dist id_date: egen emp_dist_date_`type' = sum(inds_all_`type')
+{txt}  3{com}.         gen share_dist_date_`type' = emp_dist_date_`type'/emp_dist_date_total
+{txt}  4{com}. {c )-}
+{txt}
+{com}. 
+. * state level composition 
+. bysort id_state id_date: egen emp_state_date_total = count(id)
+{txt}
+{com}. foreach type in plantation factories mining {c -(}
+{txt}  2{com}.         bysort id_state id_date: egen emp_state_date_`type' = sum(inds_all_`type')
+{txt}  3{com}.         gen share_state_date_`type' = emp_state_date_`type'/emp_state_date_total
+{txt}  4{com}. {c )-}
+{txt}
+{com}. 
+. 
+. * District and state level industry employment transition of individuals, pre-post
+. bysort id (id_date) : gen inds_reframe_lag = inds_reframe[_n-1]
+{txt}(22,050 missing values generated)
+
+{com}. 
+. 
+. * (best way to show this is state by state by year, because some effects might wary overtime)
+. * (group state by treatment and control group)
+. 
+. 
+. save labor_reform_sample_Feb9ninght,replace
+{txt}(note: file labor_reform_sample_Feb9ninght.dta not found)
+file labor_reform_sample_Feb9ninght.dta saved
+
+{com}. 
+. 
+. **** mind the boundary cases. boundary at the treatment date
+. 
+. ********************************************************************************
+. *********** Summary stats: industry distribution and individual dynamics ******
+. ********************************************************************************
+. 
+. * distribution unconditional employment 
+. tab inds
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}         24        0.11        0.11
+{txt}Automobiles and Other Transport Equip.. {c |}{res}        110        0.52        0.64
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}        233        1.10        1.74
+{txt}                    Chemical Industries {c |}{res}         94        0.45        2.18
+{txt}          Communication, Post & Courier {c |}{res}         61        0.29        2.47
+{txt}                       Crop Cultivation {c |}{res}      1,946        9.22       11.70
+{txt}                       Defence Services {c |}{res}         44        0.21       11.91
+{txt}                              Education {c |}{res}        504        2.39       14.29
+{txt}               Entertainment and Sports {c |}{res}         14        0.07       14.36
+{txt}                     Financial Services {c |}{res}        251        1.19       15.55
+{txt}                                Fishing {c |}{res}         27        0.13       15.68
+{txt}                        Food Industries {c |}{res}        279        1.32       17.00
+{txt}  Footwear and other Leather Industries {c |}{res}         67        0.32       17.32
+{txt}        Forestry including Wood Cutting {c |}{res}          6        0.03       17.35
+{txt}           Fruits and Vegetable Farming {c |}{res}        172        0.82       18.16
+{txt}                       Gems & Jewellery {c |}{res}         67        0.32       18.48
+{txt}                  Handicraft Industries {c |}{res}         27        0.13       18.61
+{txt}                            Health Care {c |}{res}        148        0.70       19.31
+{txt}                 Hotels and Restaurants {c |}{res}        148        0.70       20.01
+{txt}                              IT & ITES {c |}{res}         81        0.38       20.39
+{txt}                Machinery Manufacturers {c |}{res}        154        0.73       21.12
+{txt}                   Media and Publishing {c |}{res}         28        0.13       21.26
+{txt}                       Metal Industries {c |}{res}        255        1.21       22.47
+{txt}                                  Mines {c |}{res}         54        0.26       22.72
+{txt}                         Not Applicable {c |}{res}     10,150       48.11       70.83
+{txt}     Personal Non-Professional Services {c |}{res}        734        3.48       74.31
+{txt}         Personal Professional Services {c |}{res}        100        0.47       74.78
+{txt}            Pharmaceutical Manufacturer {c |}{res}         39        0.18       74.97
+{txt}            Plantation Crop Cultivation {c |}{res}         10        0.05       75.01
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}         56        0.27       75.28
+{txt}         Public Administrative Services {c |}{res}        390        1.85       77.13
+{txt}             Real Estate & Construction {c |}{res}      1,771        8.39       85.52
+{txt}                           Retail Trade {c |}{res}      1,753        8.31       93.83
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}         35        0.17       93.99
+{txt}                     Textile Industries {c |}{res}        398        1.89       95.88
+{txt}                     Travel and Tourism {c |}{res}        638        3.02       98.91
+{txt}                              Utilities {c |}{res}         81        0.38       99.29
+{txt}                        Wholesale Trade {c |}{res}        150        0.71      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}     21,099      100.00
+{txt}
+{com}. tab inds_notapplicable
+
+  {txt}inds==Not {c |}
+ Applicable {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}     10,949       51.89       51.89
+{txt}          1 {c |}{res}     10,150       48.11      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     21,099      100.00
+{txt}
+{com}. tab inds_notrelevant
+
+{txt}inds_notrel {c |}
+      evant {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}      4,040       32.74       32.74
+{txt}          1 {c |}{res}      8,299       67.26      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     12,339      100.00
+{txt}
+{com}. tab inds_all_factories
+
+{txt}inds_all_fa {c |}
+    ctories {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}     10,930       88.58       88.58
+{txt}          1 {c |}{res}      1,409       11.42      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     12,339      100.00
+{txt}
+{com}. tab inds_all_mining
+
+{txt}inds_all_mi {c |}
+       ning {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}     11,949       96.84       96.84
+{txt}          1 {c |}{res}        390        3.16      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     12,339      100.00
+{txt}
+{com}. tab inds_all_plantation
+
+{txt}inds_all_pl {c |}
+   antation {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}     10,098       81.84       81.84
+{txt}          1 {c |}{res}      2,241       18.16      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     12,339      100.00
+{txt}
+{com}. 
+. ******** CAVEAT all of these are not weighted --- the actual representative distribution of India should be more scrutinized. 
+. 
+. 
+. * What are the not applicable's occupation?
+. // after deleting ever-students and ever-retired, 94% of the not applicable are homemaker
+. tab nature if inds == "Not Applicable"
+
+                   {txt}NATURE_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+                  Agricultural Labourer {c |}{res}         20        0.20        0.20
+{txt}                            Businessman {c |}{res}         34        0.33        0.53
+{txt}                             Home Maker {c |}{res}      9,654       95.11       95.65
+{txt}                      Home-based Worker {c |}{res}          3        0.03       95.67
+{txt}                     Industrial Workers {c |}{res}         28        0.28       95.95
+{txt}                                Manager {c |}{res}          1        0.01       95.96
+{txt}                       Organised Farmer {c |}{res}         11        0.11       96.07
+{txt}             Self employed professional {c |}{res}         15        0.15       96.22
+{txt}                           Small Farmer {c |}{res}         15        0.15       96.36
+{txt}Small Trader/Hawker/ Businessman with.. {c |}{res}         17        0.17       96.53
+{txt}                          Support Staff {c |}{res}         24        0.24       96.77
+{txt}                             Unoccupied {c |}{res}        213        2.10       98.87
+{txt}                          Wage Labourer {c |}{res}         73        0.72       99.59
+{txt}                    White collar worker {c |}{res}         42        0.41      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}     10,150      100.00
+{txt}
+{com}. 
+. * roughly industry employment distribution for the treated states
+. tab state inds_reframe if state_ever_treated == 1
+
+                 {txt}{c |}                      inds_reframe
+           STATE {c |}        -1          0          1          2          3 {c |}     Total
+{hline 17}{c +}{hline 55}{c +}{hline 10}
+           Assam {c |}{res}        82         87          6          1          5 {txt}{c |}{res}       181 
+{txt}         Gujarat {c |}{res}       588        470         93         41        175 {txt}{c |}{res}     1,367 
+{txt}         Haryana {c |}{res}       387        324         49         12         54 {txt}{c |}{res}       826 
+{txt}  Madhya Pradesh {c |}{res}       589        433         77         21        175 {txt}{c |}{res}     1,295 
+{txt}     Maharashtra {c |}{res}     1,180      1,000        163         35        424 {txt}{c |}{res}     2,802 
+{txt}       Rajasthan {c |}{res}       715        634         54          6         99 {txt}{c |}{res}     1,508 
+{txt}{hline 17}{c +}{hline 55}{c +}{hline 10}
+           Total {c |}{res}     3,541      2,948        442        116        932 {txt}{c |}{res}     7,979 
+{txt}
+{com}. 
+. * Summary stats about the reform
+. codebook reformed
+
+{txt}{hline}
+{res}reformed{right:(unlabeled)}
+{txt}{hline}
+
+{col 19}type:  numeric ({res}float{txt})
+
+{col 18}range:  [{res}0{txt},{res}1{txt}]{col 55}units:  {res}1
+{col 10}{txt}unique values:  {res}2{col 51}{txt}missing .:  {res}0{txt}/{res}22,489
+
+{txt}{col 13}tabulation:  Freq.  Value
+{col 21}{res}    19,037{col 33}0
+{col 21}     3,452{col 33}1
+{txt}
+{com}. tab reformed
+
+   {txt}reformed {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          0 {c |}{res}     19,037       84.65       84.65
+{txt}          1 {c |}{res}      3,452       15.35      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     22,489      100.00
+{txt}
+{com}. tab state reformed  
+
+                 {txt}{c |}       reformed
+           STATE {c |}         0          1 {c |}     Total
+{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Assam {c |}{res}       113         68 {txt}{c |}{res}       181 
+{txt}           Bihar {c |}{res}     1,313          0 {txt}{c |}{res}     1,313 
+{txt}      Chandigarh {c |}{res}        63          0 {txt}{c |}{res}        63 
+{txt}    Chhattisgarh {c |}{res}       688          0 {txt}{c |}{res}       688 
+{txt}           Delhi {c |}{res}       232          0 {txt}{c |}{res}       232 
+{txt}             Goa {c |}{res}       169          0 {txt}{c |}{res}       169 
+{txt}         Gujarat {c |}{res}     1,367          0 {txt}{c |}{res}     1,367 
+{txt}         Haryana {c |}{res}       283        543 {txt}{c |}{res}       826 
+{txt}Himachal Pradesh {c |}{res}       171          0 {txt}{c |}{res}       171 
+{txt} Jammu & Kashmir {c |}{res}       390          0 {txt}{c |}{res}       390 
+{txt}       Karnataka {c |}{res}     1,352          0 {txt}{c |}{res}     1,352 
+{txt}          Kerala {c |}{res}       559          0 {txt}{c |}{res}       559 
+{txt}  Madhya Pradesh {c |}{res}       803        492 {txt}{c |}{res}     1,295 
+{txt}     Maharashtra {c |}{res}     1,768      1,034 {txt}{c |}{res}     2,802 
+{txt}       Meghalaya {c |}{res}        68          0 {txt}{c |}{res}        68 
+{txt}          Odisha {c |}{res}       854          0 {txt}{c |}{res}       854 
+{txt}      Puducherry {c |}{res}       167          0 {txt}{c |}{res}       167 
+{txt}          Punjab {c |}{res}       895          0 {txt}{c |}{res}       895 
+{txt}       Rajasthan {c |}{res}       193      1,315 {txt}{c |}{res}     1,508 
+{txt}          Sikkim {c |}{res}        14          0 {txt}{c |}{res}        14 
+{txt}      Tamil Nadu {c |}{res}     1,293          0 {txt}{c |}{res}     1,293 
+{txt}       Telangana {c |}{res}       689          0 {txt}{c |}{res}       689 
+{txt}         Tripura {c |}{res}        62          0 {txt}{c |}{res}        62 
+{txt}   Uttar Pradesh {c |}{res}     3,594          0 {txt}{c |}{res}     3,594 
+{txt}     Uttarakhand {c |}{res}       248          0 {txt}{c |}{res}       248 
+{txt}     West Bengal {c |}{res}     1,689          0 {txt}{c |}{res}     1,689 
+{txt}{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Total {c |}{res}    19,037      3,452 {txt}{c |}{res}    22,489 
+{txt}
+{com}. tab state reformed if state_ever_treated == 1
+
+                 {txt}{c |}       reformed
+           STATE {c |}         0          1 {c |}     Total
+{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Assam {c |}{res}       113         68 {txt}{c |}{res}       181 
+{txt}         Gujarat {c |}{res}     1,367          0 {txt}{c |}{res}     1,367 
+{txt}         Haryana {c |}{res}       283        543 {txt}{c |}{res}       826 
+{txt}  Madhya Pradesh {c |}{res}       803        492 {txt}{c |}{res}     1,295 
+{txt}     Maharashtra {c |}{res}     1,768      1,034 {txt}{c |}{res}     2,802 
+{txt}       Rajasthan {c |}{res}       193      1,315 {txt}{c |}{res}     1,508 
+{txt}{hline 17}{c +}{hline 22}{c +}{hline 10}
+           Total {c |}{res}     4,527      3,452 {txt}{c |}{res}     7,979 
+{txt}
+{com}. local list_states_treated Maharashtra Rajasthan "Madhya Pradesh" Haryana Gujarat Assam
+{txt}
+{com}. foreach var in `list_states_treated'{c -(}
+{txt}  2{com}.         disp("*************************")
+{txt}  3{com}.         disp("Current State is `var'")
+{txt}  4{com}.         disp("*************************")
+{txt}  5{com}. tab inds if state =="`var'"
+{txt}  6{com}. {c )-}
+*************************
+Current State is Maharashtra
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}          4        0.15        0.15
+{txt}Automobiles and Other Transport Equip.. {c |}{res}         22        0.83        0.98
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}          8        0.30        1.29
+{txt}                    Chemical Industries {c |}{res}         19        0.72        2.01
+{txt}          Communication, Post & Courier {c |}{res}          4        0.15        2.16
+{txt}                       Crop Cultivation {c |}{res}        367       13.90       16.06
+{txt}                       Defence Services {c |}{res}          1        0.04       16.10
+{txt}                              Education {c |}{res}         50        1.89       17.99
+{txt}               Entertainment and Sports {c |}{res}          3        0.11       18.11
+{txt}                     Financial Services {c |}{res}         67        2.54       20.64
+{txt}                                Fishing {c |}{res}          4        0.15       20.80
+{txt}                        Food Industries {c |}{res}         24        0.91       21.70
+{txt}  Footwear and other Leather Industries {c |}{res}          4        0.15       21.86
+{txt}           Fruits and Vegetable Farming {c |}{res}         46        1.74       23.60
+{txt}                       Gems & Jewellery {c |}{res}          6        0.23       23.83
+{txt}                  Handicraft Industries {c |}{res}          3        0.11       23.94
+{txt}                            Health Care {c |}{res}         23        0.87       24.81
+{txt}                 Hotels and Restaurants {c |}{res}         27        1.02       25.83
+{txt}                              IT & ITES {c |}{res}         13        0.49       26.33
+{txt}                Machinery Manufacturers {c |}{res}         31        1.17       27.50
+{txt}                   Media and Publishing {c |}{res}          6        0.23       27.73
+{txt}                       Metal Industries {c |}{res}         22        0.83       28.56
+{txt}                                  Mines {c |}{res}          4        0.15       28.71
+{txt}                         Not Applicable {c |}{res}      1,180       44.70       73.41
+{txt}     Personal Non-Professional Services {c |}{res}         75        2.84       76.25
+{txt}         Personal Professional Services {c |}{res}          8        0.30       76.55
+{txt}            Pharmaceutical Manufacturer {c |}{res}          9        0.34       76.89
+{txt}            Plantation Crop Cultivation {c |}{res}          1        0.04       76.93
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}          2        0.08       77.01
+{txt}         Public Administrative Services {c |}{res}         46        1.74       78.75
+{txt}             Real Estate & Construction {c |}{res}        190        7.20       85.95
+{txt}                           Retail Trade {c |}{res}        182        6.89       92.84
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}          3        0.11       92.95
+{txt}                     Textile Industries {c |}{res}         43        1.63       94.58
+{txt}                     Travel and Tourism {c |}{res}        116        4.39       98.98
+{txt}                              Utilities {c |}{res}          9        0.34       99.32
+{txt}                        Wholesale Trade {c |}{res}         18        0.68      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}      2,640      100.00
+*************************
+Current State is Rajasthan
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}          2        0.14        0.14
+{txt}Automobiles and Other Transport Equip.. {c |}{res}          3        0.21        0.36
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}         13        0.93        1.29
+{txt}                    Chemical Industries {c |}{res}          2        0.14        1.43
+{txt}          Communication, Post & Courier {c |}{res}          4        0.29        1.72
+{txt}                       Crop Cultivation {c |}{res}         92        6.58        8.30
+{txt}                       Defence Services {c |}{res}          3        0.21        8.51
+{txt}                              Education {c |}{res}         52        3.72       12.23
+{txt}               Entertainment and Sports {c |}{res}          1        0.07       12.30
+{txt}                     Financial Services {c |}{res}          9        0.64       12.95
+{txt}                        Food Industries {c |}{res}         14        1.00       13.95
+{txt}           Fruits and Vegetable Farming {c |}{res}          4        0.29       14.23
+{txt}                       Gems & Jewellery {c |}{res}          4        0.29       14.52
+{txt}                  Handicraft Industries {c |}{res}          2        0.14       14.66
+{txt}                            Health Care {c |}{res}          6        0.43       15.09
+{txt}                 Hotels and Restaurants {c |}{res}         11        0.79       15.88
+{txt}                Machinery Manufacturers {c |}{res}          1        0.07       15.95
+{txt}                       Metal Industries {c |}{res}          4        0.29       16.24
+{txt}                         Not Applicable {c |}{res}        715       51.14       67.38
+{txt}     Personal Non-Professional Services {c |}{res}         15        1.07       68.45
+{txt}         Personal Professional Services {c |}{res}          5        0.36       68.81
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}          1        0.07       68.88
+{txt}         Public Administrative Services {c |}{res}         17        1.22       70.10
+{txt}             Real Estate & Construction {c |}{res}        209       14.95       85.05
+{txt}                           Retail Trade {c |}{res}        152       10.87       95.92
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}          1        0.07       95.99
+{txt}                     Textile Industries {c |}{res}         20        1.43       97.42
+{txt}                     Travel and Tourism {c |}{res}         27        1.93       99.36
+{txt}                              Utilities {c |}{res}          2        0.14       99.50
+{txt}                        Wholesale Trade {c |}{res}          7        0.50      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}      1,398      100.00
+*************************
+Current State is Madhya Pradesh
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+Automobiles and Other Transport Equip.. {c |}{res}          5        0.41        0.41
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}         11        0.91        1.32
+{txt}                    Chemical Industries {c |}{res}          1        0.08        1.40
+{txt}          Communication, Post & Courier {c |}{res}          2        0.17        1.57
+{txt}                       Crop Cultivation {c |}{res}        156       12.89       14.46
+{txt}                       Defence Services {c |}{res}          1        0.08       14.55
+{txt}                              Education {c |}{res}         33        2.73       17.27
+{txt}               Entertainment and Sports {c |}{res}          1        0.08       17.36
+{txt}                     Financial Services {c |}{res}          4        0.33       17.69
+{txt}                        Food Industries {c |}{res}         21        1.74       19.42
+{txt}  Footwear and other Leather Industries {c |}{res}          4        0.33       19.75
+{txt}        Forestry including Wood Cutting {c |}{res}          1        0.08       19.83
+{txt}           Fruits and Vegetable Farming {c |}{res}         17        1.40       21.24
+{txt}                       Gems & Jewellery {c |}{res}          2        0.17       21.40
+{txt}                  Handicraft Industries {c |}{res}          6        0.50       21.90
+{txt}                            Health Care {c |}{res}          6        0.50       22.40
+{txt}                 Hotels and Restaurants {c |}{res}          8        0.66       23.06
+{txt}                              IT & ITES {c |}{res}          1        0.08       23.14
+{txt}                Machinery Manufacturers {c |}{res}          7        0.58       23.72
+{txt}                   Media and Publishing {c |}{res}          1        0.08       23.80
+{txt}                       Metal Industries {c |}{res}          2        0.17       23.97
+{txt}                                  Mines {c |}{res}         16        1.32       25.29
+{txt}                         Not Applicable {c |}{res}        589       48.68       73.97
+{txt}     Personal Non-Professional Services {c |}{res}         53        4.38       78.35
+{txt}         Personal Professional Services {c |}{res}          4        0.33       78.68
+{txt}            Pharmaceutical Manufacturer {c |}{res}          1        0.08       78.76
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}          1        0.08       78.84
+{txt}         Public Administrative Services {c |}{res}         20        1.65       80.50
+{txt}             Real Estate & Construction {c |}{res}         72        5.95       86.45
+{txt}                           Retail Trade {c |}{res}        109        9.01       95.45
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}          9        0.74       96.20
+{txt}                     Textile Industries {c |}{res}         18        1.49       97.69
+{txt}                     Travel and Tourism {c |}{res}         18        1.49       99.17
+{txt}                              Utilities {c |}{res}          3        0.25       99.42
+{txt}                        Wholesale Trade {c |}{res}          7        0.58      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}      1,210      100.00
+*************************
+Current State is Haryana
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}          1        0.13        0.13
+{txt}Automobiles and Other Transport Equip.. {c |}{res}          3        0.38        0.51
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}          3        0.38        0.90
+{txt}                    Chemical Industries {c |}{res}          6        0.77        1.67
+{txt}          Communication, Post & Courier {c |}{res}          1        0.13        1.79
+{txt}                       Crop Cultivation {c |}{res}         52        6.67        8.46
+{txt}                       Defence Services {c |}{res}          2        0.26        8.72
+{txt}                              Education {c |}{res}         24        3.08       11.79
+{txt}                     Financial Services {c |}{res}         14        1.79       13.59
+{txt}                        Food Industries {c |}{res}          7        0.90       14.49
+{txt}  Footwear and other Leather Industries {c |}{res}          5        0.64       15.13
+{txt}           Fruits and Vegetable Farming {c |}{res}          1        0.13       15.26
+{txt}                            Health Care {c |}{res}          3        0.38       15.64
+{txt}                 Hotels and Restaurants {c |}{res}          3        0.38       16.03
+{txt}                              IT & ITES {c |}{res}          3        0.38       16.41
+{txt}                Machinery Manufacturers {c |}{res}          7        0.90       17.31
+{txt}                       Metal Industries {c |}{res}         11        1.41       18.72
+{txt}                         Not Applicable {c |}{res}        387       49.62       68.33
+{txt}     Personal Non-Professional Services {c |}{res}          7        0.90       69.23
+{txt}         Personal Professional Services {c |}{res}          8        1.03       70.26
+{txt}            Pharmaceutical Manufacturer {c |}{res}          1        0.13       70.38
+{txt}         Public Administrative Services {c |}{res}         15        1.92       72.31
+{txt}             Real Estate & Construction {c |}{res}         67        8.59       80.90
+{txt}                           Retail Trade {c |}{res}         98       12.56       93.46
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}          1        0.13       93.59
+{txt}                     Textile Industries {c |}{res}         16        2.05       95.64
+{txt}                     Travel and Tourism {c |}{res}         22        2.82       98.46
+{txt}                              Utilities {c |}{res}          1        0.13       98.59
+{txt}                        Wholesale Trade {c |}{res}         11        1.41      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}        780      100.00
+*************************
+Current State is Gujarat
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+         Agriculture- allied activities {c |}{res}          1        0.08        0.08
+{txt}Automobiles and Other Transport Equip.. {c |}{res}          6        0.47        0.54
+{txt}Cement, Tiles, Bricks, Ceramics, Glas.. {c |}{res}          6        0.47        1.01
+{txt}                    Chemical Industries {c |}{res}         19        1.48        2.49
+{txt}          Communication, Post & Courier {c |}{res}          1        0.08        2.57
+{txt}                       Crop Cultivation {c |}{res}        135       10.50       13.06
+{txt}                       Defence Services {c |}{res}          2        0.16       13.22
+{txt}                              Education {c |}{res}          6        0.47       13.69
+{txt}               Entertainment and Sports {c |}{res}          2        0.16       13.84
+{txt}                     Financial Services {c |}{res}          6        0.47       14.31
+{txt}                                Fishing {c |}{res}          1        0.08       14.39
+{txt}                        Food Industries {c |}{res}          9        0.70       15.09
+{txt}  Footwear and other Leather Industries {c |}{res}          1        0.08       15.16
+{txt}           Fruits and Vegetable Farming {c |}{res}          9        0.70       15.86
+{txt}                       Gems & Jewellery {c |}{res}         22        1.71       17.57
+{txt}                  Handicraft Industries {c |}{res}          2        0.16       17.73
+{txt}                            Health Care {c |}{res}          8        0.62       18.35
+{txt}                 Hotels and Restaurants {c |}{res}          4        0.31       18.66
+{txt}                              IT & ITES {c |}{res}          1        0.08       18.74
+{txt}                Machinery Manufacturers {c |}{res}         14        1.09       19.83
+{txt}                       Metal Industries {c |}{res}         35        2.72       22.55
+{txt}                         Not Applicable {c |}{res}        588       45.72       68.27
+{txt}     Personal Non-Professional Services {c |}{res}        140       10.89       79.16
+{txt}         Personal Professional Services {c |}{res}         10        0.78       79.94
+{txt}            Pharmaceutical Manufacturer {c |}{res}          5        0.39       80.33
+{txt}Poultry Farming, Animal Husbandry and.. {c |}{res}         29        2.26       82.58
+{txt}         Public Administrative Services {c |}{res}         17        1.32       83.90
+{txt}             Real Estate & Construction {c |}{res}         40        3.11       87.01
+{txt}                           Retail Trade {c |}{res}         80        6.22       93.23
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}          1        0.08       93.31
+{txt}                     Textile Industries {c |}{res}         32        2.49       95.80
+{txt}                     Travel and Tourism {c |}{res}         46        3.58       99.38
+{txt}                              Utilities {c |}{res}          6        0.47       99.84
+{txt}                        Wholesale Trade {c |}{res}          2        0.16      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}      1,286      100.00
+*************************
+Current State is Assam
+*************************
+
+                 {txt}INDUSTRY_OF_OCCUPATION {c |}      Freq.     Percent        Cum.
+{hline 40}{c +}{hline 35}
+Automobiles and Other Transport Equip.. {c |}{res}          1        0.58        0.58
+{txt}                       Crop Cultivation {c |}{res}          5        2.92        3.51
+{txt}                              Education {c |}{res}          3        1.75        5.26
+{txt}                     Financial Services {c |}{res}          2        1.17        6.43
+{txt}                        Food Industries {c |}{res}          4        2.34        8.77
+{txt}                            Health Care {c |}{res}          6        3.51       12.28
+{txt}                 Hotels and Restaurants {c |}{res}          3        1.75       14.04
+{txt}                   Media and Publishing {c |}{res}          1        0.58       14.62
+{txt}                       Metal Industries {c |}{res}          1        0.58       15.20
+{txt}                         Not Applicable {c |}{res}         82       47.95       63.16
+{txt}     Personal Non-Professional Services {c |}{res}          8        4.68       67.84
+{txt}         Personal Professional Services {c |}{res}          3        1.75       69.59
+{txt}         Public Administrative Services {c |}{res}          3        1.75       71.35
+{txt}             Real Estate & Construction {c |}{res}         17        9.94       81.29
+{txt}                           Retail Trade {c |}{res}         14        8.19       89.47
+{txt}Soaps, Detergents, Cosmetics, Toiletr.. {c |}{res}          1        0.58       90.06
+{txt}                     Travel and Tourism {c |}{res}         10        5.85       95.91
+{txt}                        Wholesale Trade {c |}{res}          7        4.09      100.00
+{txt}{hline 40}{c +}{hline 35}
+                                  Total {c |}{res}        171      100.00
+{txt}
+{com}. 
+. 
+. ******* Caveat: this needs to be done controlling for occupation: we don't care managers in factories's moving around. 
+. 
+. 
+. 
+. * Transition
+. tab inds_reframe_lag inds_reframe if reformed==1, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                inds_reframe
+    me_lag {c |}        -1          0          1          3 {c |}     Total
+{hline 11}{c +}{hline 44}{c +}{hline 10}
+        -1 {c |}{res}        37          3          0          1 {txt}{c |}{res}        41 
+           {txt}{c |}{res}     90.24       7.32       0.00       2.44 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+         0 {c |}{res}         9         27          2          1 {txt}{c |}{res}        39 
+           {txt}{c |}{res}     23.08      69.23       5.13       2.56 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+         1 {c |}{res}         0          1          3          0 {txt}{c |}{res}         4 
+           {txt}{c |}{res}      0.00      25.00      75.00       0.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+         3 {c |}{res}         1          0          0          4 {txt}{c |}{res}         5 
+           {txt}{c |}{res}     20.00       0.00       0.00      80.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+     Total {c |}{res}        47         31          5          6 {txt}{c |}{res}        89 
+           {txt}{c |}{res}     52.81      34.83       5.62       6.74 {txt}{c |}{res}    100.00 
+{txt}
+{com}. tab inds_reframe_lag inds_reframe if reformed==0, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                      inds_reframe
+    me_lag {c |}        -1          0          1          2          3 {c |}     Total
+{hline 11}{c +}{hline 55}{c +}{hline 10}
+        -1 {c |}{res}       122         11          2          0          2 {txt}{c |}{res}       137 
+           {txt}{c |}{res}     89.05       8.03       1.46       0.00       1.46 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         0 {c |}{res}        22         98         10          1         11 {txt}{c |}{res}       142 
+           {txt}{c |}{res}     15.49      69.01       7.04       0.70       7.75 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         1 {c |}{res}         2         12         10          1          1 {txt}{c |}{res}        26 
+           {txt}{c |}{res}      7.69      46.15      38.46       3.85       3.85 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         2 {c |}{res}         0          2          0          5          1 {txt}{c |}{res}         8 
+           {txt}{c |}{res}      0.00      25.00       0.00      62.50      12.50 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         3 {c |}{res}         2          8          1          1         25 {txt}{c |}{res}        37 
+           {txt}{c |}{res}      5.41      21.62       2.70       2.70      67.57 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+     Total {c |}{res}       148        131         23          8         40 {txt}{c |}{res}       350 
+           {txt}{c |}{res}     42.29      37.43       6.57       2.29      11.43 {txt}{c |}{res}    100.00 
+{txt}
+{com}. tab inds_reframe_lag inds_reframe if reformed==1 & state_ever_treated==1, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                inds_reframe
+    me_lag {c |}        -1          0          1          3 {c |}     Total
+{hline 11}{c +}{hline 44}{c +}{hline 10}
+        -1 {c |}{res}        37          3          0          1 {txt}{c |}{res}        41 
+           {txt}{c |}{res}     90.24       7.32       0.00       2.44 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+         0 {c |}{res}         9         27          2          1 {txt}{c |}{res}        39 
+           {txt}{c |}{res}     23.08      69.23       5.13       2.56 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+         1 {c |}{res}         0          1          3          0 {txt}{c |}{res}         4 
+           {txt}{c |}{res}      0.00      25.00      75.00       0.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+         3 {c |}{res}         1          0          0          4 {txt}{c |}{res}         5 
+           {txt}{c |}{res}     20.00       0.00       0.00      80.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 44}{c +}{hline 10}
+     Total {c |}{res}        47         31          5          6 {txt}{c |}{res}        89 
+           {txt}{c |}{res}     52.81      34.83       5.62       6.74 {txt}{c |}{res}    100.00 
+{txt}
+{com}. tab inds_reframe_lag inds_reframe if reformed==0 & state_ever_treated==1, row
+{txt}
+{c TLC}{hline 16}{c TRC}
+{c |} Key{col 18}{c |}
+{c LT}{hline 16}{c RT}
+{c |}{space 3}{it:frequency}{col 18}{c |}
+{c |}{space 1}{it:row percentage}{col 18}{c |}
+{c BLC}{hline 16}{c BRC}
+
+inds_refra {c |}                      inds_reframe
+    me_lag {c |}        -1          0          1          2          3 {c |}     Total
+{hline 11}{c +}{hline 55}{c +}{hline 10}
+        -1 {c |}{res}        20          1          0          0          0 {txt}{c |}{res}        21 
+           {txt}{c |}{res}     95.24       4.76       0.00       0.00       0.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         0 {c |}{res}         3         15          1          0          3 {txt}{c |}{res}        22 
+           {txt}{c |}{res}     13.64      68.18       4.55       0.00      13.64 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         1 {c |}{res}         0          0          2          0          0 {txt}{c |}{res}         2 
+           {txt}{c |}{res}      0.00       0.00     100.00       0.00       0.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         2 {c |}{res}         0          2          0          1          0 {txt}{c |}{res}         3 
+           {txt}{c |}{res}      0.00      66.67       0.00      33.33       0.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+         3 {c |}{res}         1          0          1          0          6 {txt}{c |}{res}         8 
+           {txt}{c |}{res}     12.50       0.00      12.50       0.00      75.00 {txt}{c |}{res}    100.00 
+{txt}{hline 11}{c +}{hline 55}{c +}{hline 10}
+     Total {c |}{res}        24         18          4          1          9 {txt}{c |}{res}        56 
+           {txt}{c |}{res}     42.86      32.14       7.14       1.79      16.07 {txt}{c |}{res}    100.00 
+{txt}
+{com}. 
+. a
+{err}command {bf}a{sf} is unrecognized
+{txt}{search r(199), local:r(199);}
+
+end of do-file
+
+{search r(199), local:r(199);}
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. *** Event study Industrial Dispute Act labor reform on various outcomes
+. 
+. clear
+{txt}
+{com}. set more off
+{txt}
+{com}. 
+. capture log close
+{smcl}
+{com}{sf}{ul off}

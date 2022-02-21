@@ -1,0 +1,78 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -l nodes=1:ppn=20,walltime=48:00:00
+#PBS -l pmem=12gb
+#PBS -N Feb9_meet
+#PBS -e Feb9_meet_e.txt
+#PBS -o Feb9_meet_o.txt
+
+#PBS -j oe
+
+ 
+
+#PBS -A open
+
+ 
+
+#PBS -m abe
+
+ 
+
+#PBS -M fxl146@psu.edu
+
+ 
+
+# Get started
+
+ 
+
+echo " "
+
+ 
+
+echo "JOB started on $(hostname -s) at $(date)"
+
+ 
+
+echo " "
+
+ 
+
+# Load in matlab and knitro
+
+module purge
+
+module load stata
+
+
+ 
+
+# Set directory
+
+ 
+
+cd '/storage/work/fxl146/Pyramids/'
+
+ 
+
+# Run the job itself
+
+ 
+
+stata -b do ES_IDAreform.do
+
+ 
+
+# Finish up
+
+ 
+
+echo " "
+
+ 
+
+echo "Job ended at $(date)"
+
+ 
+
+echo " "

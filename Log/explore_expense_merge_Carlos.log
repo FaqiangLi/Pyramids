@@ -1,0 +1,873 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do explore_expense_merge_Carlos.do 
+
+. **** Expense merged with Carlos' datasets
+. clear
+
+. set more off
+
+. set seed 123456
+
+. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. use carlos_employment_income_1618,replace
+
+. 
+. * This script bases on Carlos Feb 15 latest script on event study. I didn't c
+> hange anything but just merge in household variables for analysis 
+. 
+. /*
+> *** do a description of income by nature of occupation (do self-employed loos
+> e income?)
+> preserve
+> collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income
+> _of_member_from_wages mean_pension=income_of_member_from_pension mean_dividen
+> d=income_of_member_from_dividend mean_interest=income_of_member_from_interest
+>  mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income
+> =income_of_member_from_all_source median_wage=income_of_member_from_wages med
+> ian_pension=income_of_member_from_pension median_dividend=income_of_member_fr
+> om_dividend median_interest=income_of_member_from_interest median_fd_pf_insur
+> ance=income_of_member_from_fd_pf_insu, by(date_m nature)
+> egen id=group(nature)
+> xtset id date_m
+> *** graphs with pairwise comparison of both mean and median income across sel
+> f-employed people and other groups
+> * july first implementation of gst
+> 
+> *mean pair-wise comparison
+> levelsof nature, local(class)
+> foreach group of local class {
+> if "`group'"~="Self Employed Entrepreneur" {
+> if length("`group'")>36 {
+>         local rows 2    
+> }
+> if length("`group'")<37 {
+>         local rows 1
+> }
+> local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.
+> )'"," ","",.)'"    
+> twoway tsline mean_income if nature=="Self Employed Entrepreneur" || tsline m
+> ean_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(title
+> gap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labs
+> ize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlengt
+> h(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") rows(
+> `rows')) 
+> 
+> graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_pair_wise_`
+> name'.pdf, replace
+> }       
+> }
+> 
+> *median pair-wise comparison
+> levelsof nature, local(class)
+> foreach group of local class {
+> if "`group'"~="Self Employed Entrepreneur" {
+> if length("`group'")>36 {
+>         local rows 2    
+> }
+> if length("`group'")<37 {
+>         local rows 1
+> }
+> local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.
+> )'"," ","",.)'"    
+> twoway tsline median_income if nature=="Self Employed Entrepreneur" || tsline
+>  median_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(t
+> itlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20, l
+> absize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tle
+> ngth(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") ro
+> ws(`rows')) 
+> graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_pair_wise
+> _`name'.pdf, replace
+> }       
+> }
+> restore 
+> 
+> preserve
+> gen self_employed=nature=="Self Employed Entrepreneur"
+> collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income
+> _of_member_from_wages mean_pension=income_of_member_from_pension mean_dividen
+> d=income_of_member_from_dividend mean_interest=income_of_member_from_interest
+>  mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income
+> =income_of_member_from_all_source median_wage=income_of_member_from_wages med
+> ian_pension=income_of_member_from_pension median_dividend=income_of_member_fr
+> om_dividend median_interest=income_of_member_from_interest median_fd_pf_insur
+> ance=income_of_member_from_fd_pf_insu, by(date_m self_employed)
+> 
+> xtset self_employed date_m
+> 
+> *** graphs with comparison of both mean and median income across self-employe
+> d people and other groups
+> 
+> *mean self employed vs the rest comparison
+>         
+> twoway tsline mean_income if self_employed==1 || tsline mean_income if self_e
+> mployed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Aver
+> age Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(
+> %tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) 
+> legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+> graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_vstherest.p
+> df, replace
+> 
+> 
+> *median self employed vs the rest comparison 
+> 
+> twoway tsline median_income if self_employed==1 || tsline median_income if se
+> lf_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("
+> Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) form
+> at(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none
+> )) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+> graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_vstherest
+> .pdf, replace
+> 
+> restore 
+> 
+> **** by industry
+> 
+> preserve
+> gen self_employed=nature_o=="Self Employed Entrepreneur"
+> bys hh_id mem_id: egen aux=max(self_employed)
+> keep if aux
+> collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income
+> _of_member_from_wages mean_pension=income_of_member_from_pension mean_dividen
+> d=income_of_member_from_dividend mean_interest=income_of_member_from_interest
+>  mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income
+> =income_of_member_from_all_source median_wage=income_of_member_from_wages med
+> ian_pension=income_of_member_from_pension median_dividend=income_of_member_fr
+> om_dividend median_interest=income_of_member_from_interest median_fd_pf_insur
+> ance=income_of_member_from_fd_pf_insu, by(date_m industry self_employed)
+> 
+> encode industry, generate(industry)
+> 
+> egen id=group(industry self_employed)
+> xtset id date_m
+> 
+> *** graphs with comparison of both mean and median income across self-employe
+> d people and other groups
+> 
+> *mean self employed vs the rest comparison
+> 
+> twoway tsline mean_income if self_employed==1& industry_=="Machinery Manufact
+> urers" || tsline mean_income if self_employed==0& industry_=="Machinery Manuf
+> acturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Avera
+> ge Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%
+> tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) l
+> egend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+> graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_machinery_m
+> anufacturers_vstherest.pdf, replace
+> 
+> *median self employed vs the rest comparison 
+> 
+> twoway tsline median_income if self_employed==1& industry_=="Machinery Manufa
+> cturers" || tsline median_income if self_employed==0& industry_=="Machinery M
+> anufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("A
+> verage Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) form
+> at(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none
+> )) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
+> graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_machinery
+> _manufacturers_vstherest.pdf, replace
+> restore 
+> 
+> /* I don't see a lot of evidence with just this grahs to say that there is a 
+> reduction on income of self-employees in general or compared to most groups
+>  we should probably look inside the industry of occupation, also porbably we 
+> can do a regression of income on education, gender, age, health, controlls,an
+> d industry-year fixed effects and then do these graphs on the residuals*/
+> */
+. *** do a survival analysis of employment arrangement (do self-employed switch
+>  out of self-employment more?)
+. 
+. 
+. 
+. * merge back the weight!!!!
+. 
+. * I add more var to help the merge
+. keep date_m nature month id hh_id mem_id industry state hr district region_ty
+> pe mem_weight_ms relation_with_hoh income_of_member_from_all_source income_of
+> _member_from_wages
+
+. 
+. gen post=date_m>tm(2017m6)
+
+. forvalues k=0(1)6 {
+  2.         gen event_`k'=date_m==tm(2017m6)+`k'
+  3. }
+
+. forvalues k=1(1)6 {
+  2.         gen event_neg`k'=date_m==tm(2017m6)-`k'
+  3. }
+
+. gen aux=dofm(date_m)
+
+. gen year=year(aux)
+
+. drop aux
+
+. ta nature, gen(nature_)
+
+                   NATURE_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                  Agricultural Labourer |    339,426        5.26        5.26
+                            Businessman |    364,634        5.65       10.91
+                             Home Maker |    764,458       11.84       22.75
+                      Home-based Worker |     59,133        0.92       23.67
+                     Industrial Workers |    224,036        3.47       27.14
+    Legislator/Social Worker/ Activists |      3,582        0.06       27.19
+                                Manager |     15,990        0.25       27.44
+      Non-Industrial Technical Employee |    152,642        2.36       29.81
+                       Organised Farmer |    203,712        3.16       32.96
+  Qualified Self Employed Professionals |     23,963        0.37       33.33
+                           Retired/Aged |    284,500        4.41       37.74
+             Self Employed Entrepreneur |    692,604       10.73       48.47
+                           Small Farmer |    500,563        7.76       56.23
+Small Trader/Hawker/ Businessman with.. |    205,914        3.19       59.42
+                                Student |    329,695        5.11       64.53
+                          Support Staff |    528,921        8.19       72.72
+                             Unoccupied |     68,510        1.06       73.78
+                          Wage Labourer |  1,149,530       17.81       91.59
+        White Collar Clerical Employees |    280,694        4.35       95.94
+White-Collar Professional Employees a.. |    261,934        4.06      100.00
+----------------------------------------+-----------------------------------
+                                  Total |  6,454,441      100.00
+
+. 
+. 
+. rename nature_1 nature_agricultural
+
+. rename nature_2 nature_business
+
+. rename nature_3 nature_homemaker
+
+. rename nature_4 nature_homeworker
+
+. rename nature_5 nature_industrialw
+
+. rename nature_6 nature_legislatoretc
+
+. rename nature_7 nature_manager
+
+. rename nature_8 nature_nonindtechemp
+
+. rename nature_9 nature_orgfarmer
+
+. rename nature_10 nature_qualified
+
+. rename nature_11 nature_retired
+
+. rename nature_12 nature_self
+
+. rename nature_13 nature_smallfarmer
+
+. rename nature_14 nature_small
+
+. rename nature_15 nature_student
+
+. rename nature_16 nature_suppstaff
+
+. rename nature_17 nature_unoccupied
+
+. rename nature_18 nature_wage
+
+. rename nature_19 nature_whiteclerical
+
+. rename nature_20 nature_whiteprofesional
+
+. 
+. rename nature_of_occupation nature 
+
+. 
+. gen nature_all=nature_business==1|nature_industrialw==1|nature_qualified==1|n
+> ature_self==1|nature_small==1
+
+. 
+. 
+. ds nature_*
+nature_agr~l  nature_leg~c  nature_ret~d  nature_sup~f  nature_all
+nature_bus~s  nature_man~r  nature_self   nature_uno~d
+nature_~aker  nature_non~p  nature_sma~r  nature_wage
+nature_~rker  nature_org~r  nature_small  nature_w~cal
+nature_ind~w  nature_qua~d  nature_stu~t  nature_w~nal
+
+. local varlist "`r(varlist)'"
+
+. 
+. foreach xx of local varlist {
+  2. xtset id date_m
+  3. local xxx "`=substr("`xx'",8,.)'"  // read the variable's nature
+  4. di as red "`xxx'"  // check display each by each the xtset status
+  5. gen L`xxx'xpost=L.`xx'*post
+  6. bys hh_id mem_id (date_m): gen past_`xxx'=sum(`xx')
+  7. replace past_`xxx'=past_`xxx'>0
+  8. gen past_`xxx'xpost=past_`xxx'*post
+  9. xtset id date_m
+ 10. forvalues k=0/6 {
+ 11. gen L`xxx'xevent_`k'=L.`xx'*event_`k' 
+ 12. }
+ 13. forvalues k=1/6 {
+ 14. gen L`xxx'xevent_neg`k'=L.`xx'*event_neg`k' 
+ 15. }
+ 16. }
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+agricultural
+(448,281 missing values generated)
+(614,895 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+business
+(448,281 missing values generated)
+(582,496 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+homemaker
+(448,281 missing values generated)
+(1,147,379 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+homeworker
+(448,281 missing values generated)
+(133,709 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+industrialw
+(448,281 missing values generated)
+(380,007 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+legislatoretc
+(448,281 missing values generated)
+(10,089 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+manager
+(448,281 missing values generated)
+(37,461 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+nonindtechemp
+(448,281 missing values generated)
+(315,573 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+orgfarmer
+(448,281 missing values generated)
+(299,752 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+qualified
+(448,281 missing values generated)
+(53,267 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+retired
+(448,281 missing values generated)
+(411,734 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+self
+(448,281 missing values generated)
+(1,211,039 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+smallfarmer
+(448,281 missing values generated)
+(823,622 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+small
+(448,281 missing values generated)
+(430,747 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+student
+(448,281 missing values generated)
+(552,895 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+suppstaff
+(448,281 missing values generated)
+(1,083,958 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+unoccupied
+(448,281 missing values generated)
+(168,920 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+wage
+(448,281 missing values generated)
+(1,891,344 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+whiteclerical
+(448,281 missing values generated)
+(490,069 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+whiteprofesional
+(448,281 missing values generated)
+(418,823 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+all
+(448,281 missing values generated)
+(2,174,707 real changes made)
+       panel variable:  id (unbalanced)
+        time variable:  date_m, 2016m1 to 2018m7, but with gaps
+                delta:  1 month
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+(448,281 missing values generated)
+
+. 
+. * group id
+. egen id_state=group(state)
+
+. egen id_hr=group(hr)
+
+. egen id_district=group(district)
+
+. gen is_urban=1 if region_type=="URBAN"
+(2,253,978 missing values generated)
+
+. replace is_urban=0 if region_type=="RURAL"
+(2,253,978 real changes made)
+
+. 
+. save carlos_employment_income_1618_event_study, replace
+file carlos_employment_income_1618_event_study.dta saved
+
+. 
+. sample 10 
+(5,808,997 observations deleted)
+
+. save carlos_employment_income_1618_event_study_10p, replace
+file carlos_employment_income_1618_event_study_10p.dta saved
+
+. 
+. sample 10
+(580,900 observations deleted)
+
+. save carlos_employment_income_1618_event_study_1p, replace
+file carlos_employment_income_1618_event_study_1p.dta saved
+
+. 
+. 
+. use carlos_employment_income_1618_event_study, replace
+
+. merge m:1 hh_id month using temp_carlos_m_expense_1618
+
+    Result                           # of obs.
+    -----------------------------------------
+    not matched                     6,233,618
+        from master                         0  (_merge==1)
+        from using                  6,233,618  (_merge==2)
+
+    matched                         6,454,441  (_merge==3)
+    -----------------------------------------
+
+. keep if _merge==3
+(6,233,618 observations deleted)
+
+. drop _merge
+
+. 
+. save carlos_emp_inc_hhmonexp_1618_event_study,replace
+(note: file carlos_emp_inc_hhmonexp_1618_event_study.dta not found)
+file carlos_emp_inc_hhmonexp_1618_event_study.dta saved
+
+. 
+. sample 10 
+(5,808,997 observations deleted)
+
+. save carlos_emp_inc_hhmonexp_1618_event_study_10p, replace
+(note: file carlos_emp_inc_hhmonexp_1618_event_study_10p.dta not found)
+file carlos_emp_inc_hhmonexp_1618_event_study_10p.dta saved
+
+. 
+. sample 10
+(580,900 observations deleted)
+
+. save carlos_emp_inc_hhmonexp_1618_event_study_1p, replace
+(note: file carlos_emp_inc_hhmonexp_1618_event_study_1p.dta not found)
+file carlos_emp_inc_hhmonexp_1618_event_study_1p.dta saved
+
+. 
+. 
+. a
+command a is unrecognized
+r(199);
+
+end of do-file
+r(199);

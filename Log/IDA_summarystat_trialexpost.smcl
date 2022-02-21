@@ -1,0 +1,1313 @@
+{smcl}
+{com}{sf}{ul off}{txt}{.-}
+      name:  {res}<unnamed>
+       {txt}log:  {res}/storage/work/f/fxl146/Pyramids/IDA_summarystat_trialexpost.smcl
+  {txt}log type:  {res}smcl
+ {txt}opened on:  {res} 9 Feb 2022, 06:47:20
+{txt}
+{com}. 
+. 
+. * identifiers
+. // i : individual (a hh_id-mem-id)
+. // t : period (a month slot in the base dataset)
+. // s : state i lives in 
+. // d : district i lives in 
+. // hr: homogenous region i lives in 
+. 
+. * caveat
+. // Aspirational India and consumption data have not incorporated in. They are at the household levels. 
+. 
+. // note that people of india has every possible month because some households are asked in different month in a wave.
+. 
+. 
+. ********************************************************************************
+. *********** Sample selection **** 
+. ********************************************************************************
+. 
+. 
+. * Sample from people of India (see clean_trim_merge_append.do)
+. clear
+{txt}
+{com}. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+{res}/gpfs/scratch/fxl146/Pyramids_statafiles
+{txt}
+{com}. use concise_1419_labor_1p,replace
+{txt}
+{com}. 
+. * Drop the obs of two ambigous states, AP and Jharkhand&
+. drop if state == "Andhra Pradesh" | state == "Jharkhand"  // around 6%
+{txt}(19,650 observations deleted)
+
+{com}. 
+. * disaggregation level (income is at id-monthslot-month level)
+. duplicates report id month_slot month
+
+{p 0 4}{txt}Duplicates in terms of {res} id month_slot month{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}       {res}304373             0
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. duplicates report id month_slot 
+
+{p 0 4}{txt}Duplicates in terms of {res} id month_slot{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}       {res}295645             0
+        {txt}2 {c |}         {res}8632          4316
+        {txt}3 {c |}           {res}96            64
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. 
+. 
+. * reformat dates
+. gen date=date(month_slot, "MY")
+{txt}
+{com}. format date %d
+{txt}
+{com}. gen date_m = month(date)
+{txt}
+{com}. gen date_y = year(date)
+{txt}
+{com}. tostring date_m date_y, replace
+{txt}date_m was {res:float} now {res:str2}
+date_y was {res:float} now {res:str4}
+
+{com}. replace date_m = "0"+date_m if strlen(date_m)==1
+{txt}(228,056 real changes made)
+
+{com}. gen date_str = date_y + date_m
+{txt}
+{com}. 
+. destring date_m date_y,replace
+{txt}date_m: all characters numeric; {res}replaced {txt}as {res}byte
+{txt}date_y: all characters numeric; {res}replaced {txt}as {res}int
+{txt}
+{com}. rename month month_of_income_data
+{res}{txt}
+{com}. 
+. * Drop extra dates
+. drop if date_y>2019
+{txt}(10,348 observations deleted)
+
+{com}. 
+. * Now, use the mean income to match people of india time label
+. rename income_of_member_from_* inc_*
+{res}{txt}
+{com}. foreach var in inc_all_source inc_wages inc_pension inc_dividend inc_interest inc_fd_pf_insu{c -(}
+{txt}  2{com}.         bysort id date: egen mean_`var' = mean(`var')
+{txt}  3{com}. {c )-}
+{txt}(17,408 missing values generated)
+(17,408 missing values generated)
+(17,408 missing values generated)
+(164,107 missing values generated)
+
+{com}. duplicates report id date
+
+{p 0 4}{txt}Duplicates in terms of {res} id date{p_end}
+
+{txt}{hline 10}{c TT}{hline 27}
+   copies {c |} observations       surplus
+{hline 10}{c +}{hline 27}
+        1 {c |}       {res}285541             0
+        {txt}2 {c |}         {res}8388          4194
+        {txt}3 {c |}           {res}96            64
+{txt}{hline 10}{c BT}{hline 27}
+
+{com}. bysort id date: keep if _n==1
+{txt}(4,258 observations deleted)
+
+{com}. 
+. 
+. * Drop students, and retired observation
+. **** CAVEAT: this needs more careful treatment in the future because status of student, homemaker and retired observation is a dynamic ones.
+. **** in this version, I drop ever-students and ever-retired
+. gen temp_student = 1 if nature_of_occupation=="Student"
+{txt}(240,670 missing values generated)
+
+{com}. bysort id (date_y date_m): egen temp_ever_student = sum(temp_student)
+{txt}
+{com}. gen temp_retired = 1 if nature_of_occupation=="Retired/Aged"
+{txt}(271,238 missing values generated)
+
+{com}. bysort id (date_y date_m): egen temp_ever_retired = sum(temp_retired)
+{txt}
+{com}. a
+{err}command {bf}a{sf} is unrecognized
+{txt}{search r(199), local:r(199);}
+
+end of do-file
+
+{search r(199), local:r(199);}
+
+{com}. count if temp_ever_student>0
+  {res}52,198
+
+{com}. temp_ever_retired>0
+{err}command {bf}temp_ever_retired{sf} is unrecognized
+{txt}{search r(199), local:r(199);}
+
+{com}. count if temp_ever_retired>0
+  {res}21,518
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. use temp_data_Feb2ninght1p,replace
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. count
+  {res}515,677
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. use labor_reform_sample_Feb9ninght,replace
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. count if reformedxinds_f==.
+  {res}0
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. use labor_reform_sample_Feb9ninght,replace
+{txt}
+{com}. duplicates drop  id_dist id_date, force
+
+{p 0 4}{txt}Duplicates in terms of {res} id_dist id_date{p_end}
+
+{txt}(4,563,750 observations deleted)
+
+{com}. sort id_dist id_date 
+{txt}
+{com}. order id_dist id_date
+{txt}
+{com}. save labor_reform_sample_Feb9ninght_distdate, replace
+{txt}(note: file labor_reform_sample_Feb9ninght_distdate.dta not found)
+file labor_reform_sample_Feb9ninght_distdate.dta saved
+
+{com}. 
+{txt}end of do-file
+
+{com}. count
+  {res}11,793
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. use labor_reform_sample_Feb9ninght_distdate,replace
+{txt}
+{com}. reghdfe share_dist_date_factories reformed , a(id_dist id_date) vce(cl id_state)
+{res}{txt}(dropped 3 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 9 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res}    11,790
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      0.56
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.4595
+{txt}{col 51}R-squared{col 67}= {res}    0.5222
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.4988
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0012
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res}    0.0527
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}share_dist~s{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-.0088457{col 26}{space 2} .0117734{col 37}{space 1}   -0.75{col 46}{space 3}0.459{col 54}{space 4}-.0330935{col 67}{space 3} .0154021
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .0570696{col 26}{space 2}  .001567{col 37}{space 1}   36.42{col 46}{space 3}0.000{col 54}{space 4} .0538423{col 67}{space 3} .0602969
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}     id_dist{col 14}{c |}{space 1}      481{col 27}{space 1}        0{col 39}{result}{space 1}      481{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        1{col 39}{result}{space 1}       70{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe share_dist_date_mining reformed , a(id_dist id_date) vce(cl id_state)
+{res}{txt}(dropped 3 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 9 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res}    11,790
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      2.15
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.1550
+{txt}{col 51}R-squared{col 67}= {res}    0.4712
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.4452
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0010
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res}    0.0208
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}share_dist~g{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2} .0031338{col 26}{space 2} .0021372{col 37}{space 1}    1.47{col 46}{space 3}0.155{col 54}{space 4}-.0012678{col 67}{space 3} .0075354
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2}  .013275{col 26}{space 2} .0003071{col 37}{space 1}   43.23{col 46}{space 3}0.000{col 54}{space 4} .0126426{col 67}{space 3} .0139075
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}     id_dist{col 14}{c |}{space 1}      481{col 27}{space 1}        0{col 39}{result}{space 1}      481{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        1{col 39}{result}{space 1}       70{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe share_dist_date_plantation reformed , a(id_dist id_date) vce(cl id_state)
+{res}{txt}(dropped 3 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 9 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res}    11,790
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      1.12
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.2996
+{txt}{col 51}R-squared{col 67}= {res}    0.5720
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.5510
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0007
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res}    0.1106
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}share_dist~n{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-.0136281{col 26}{space 2} .0128653{col 37}{space 1}   -1.06{col 46}{space 3}0.300{col 54}{space 4}-.0401247{col 67}{space 3} .0128684
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .1514058{col 26}{space 2} .0018932{col 37}{space 1}   79.97{col 46}{space 3}0.000{col 54}{space 4} .1475066{col 67}{space 3}  .155305
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}     id_dist{col 14}{c |}{space 1}      481{col 27}{space 1}        0{col 39}{result}{space 1}      481{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        1{col 39}{result}{space 1}       70{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. tab id_date
+
+{txt}group(date_ {c |}
+       str) {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          1 {c |}{res}        146        1.24        1.24
+{txt}          2 {c |}{res}        185        1.57        2.81
+{txt}          3 {c |}{res}        193        1.64        4.44
+{txt}          4 {c |}{res}        143        1.21        5.66
+{txt}          5 {c |}{res}        161        1.37        7.02
+{txt}          6 {c |}{res}        176        1.49        8.51
+{txt}          7 {c |}{res}        167        1.42        9.93
+{txt}          8 {c |}{res}        142        1.20       11.13
+{txt}          9 {c |}{res}        156        1.32       12.46
+{txt}         10 {c |}{res}        177        1.50       13.96
+{txt}         11 {c |}{res}        165        1.40       15.36
+{txt}         12 {c |}{res}        147        1.25       16.60
+{txt}         13 {c |}{res}        150        1.27       17.88
+{txt}         14 {c |}{res}        172        1.46       19.33
+{txt}         15 {c |}{res}        165        1.40       20.73
+{txt}         16 {c |}{res}        138        1.17       21.90
+{txt}         17 {c |}{res}        146        1.24       23.14
+{txt}         18 {c |}{res}        173        1.47       24.61
+{txt}         19 {c |}{res}        163        1.38       25.99
+{txt}         20 {c |}{res}        136        1.15       27.14
+{txt}         21 {c |}{res}        150        1.27       28.42
+{txt}         22 {c |}{res}        172        1.46       29.87
+{txt}         23 {c |}{res}        161        1.37       31.24
+{txt}         24 {c |}{res}        146        1.24       32.48
+{txt}         25 {c |}{res}        144        1.22       33.70
+{txt}         26 {c |}{res}        170        1.44       35.14
+{txt}         27 {c |}{res}        160        1.36       36.50
+{txt}         28 {c |}{res}        141        1.20       37.69
+{txt}         29 {c |}{res}        140        1.19       38.88
+{txt}         30 {c |}{res}        166        1.41       40.29
+{txt}         31 {c |}{res}        160        1.36       41.64
+{txt}         32 {c |}{res}        141        1.20       42.84
+{txt}         33 {c |}{res}        140        1.19       44.03
+{txt}         34 {c |}{res}        165        1.40       45.43
+{txt}         35 {c |}{res}        159        1.35       46.77
+{txt}         36 {c |}{res}        141        1.20       47.97
+{txt}         37 {c |}{res}        140        1.19       49.16
+{txt}         38 {c |}{res}        166        1.41       50.56
+{txt}         39 {c |}{res}        158        1.34       51.90
+{txt}         40 {c |}{res}        140        1.19       53.09
+{txt}         41 {c |}{res}        140        1.19       54.28
+{txt}         42 {c |}{res}        163        1.38       55.66
+{txt}         43 {c |}{res}        154        1.31       56.97
+{txt}         44 {c |}{res}        160        1.36       58.32
+{txt}         45 {c |}{res}        161        1.37       59.69
+{txt}         46 {c |}{res}        191        1.62       61.31
+{txt}         47 {c |}{res}        179        1.52       62.83
+{txt}         48 {c |}{res}        166        1.41       64.23
+{txt}         49 {c |}{res}        172        1.46       65.69
+{txt}         50 {c |}{res}        196        1.66       67.35
+{txt}         51 {c |}{res}        183        1.55       68.91
+{txt}         52 {c |}{res}        170        1.44       70.35
+{txt}         53 {c |}{res}        174        1.48       71.82
+{txt}         54 {c |}{res}        200        1.70       73.52
+{txt}         55 {c |}{res}        184        1.56       75.08
+{txt}         56 {c |}{res}        169        1.43       76.51
+{txt}         57 {c |}{res}        174        1.48       77.99
+{txt}         58 {c |}{res}        202        1.71       79.70
+{txt}         59 {c |}{res}        187        1.59       81.29
+{txt}         60 {c |}{res}        171        1.45       82.74
+{txt}         61 {c |}{res}        175        1.48       84.22
+{txt}         62 {c |}{res}        205        1.74       85.96
+{txt}         63 {c |}{res}        188        1.59       87.55
+{txt}         64 {c |}{res}        172        1.46       89.01
+{txt}         65 {c |}{res}        175        1.48       90.49
+{txt}         66 {c |}{res}        204        1.73       92.22
+{txt}         67 {c |}{res}        187        1.59       93.81
+{txt}         68 {c |}{res}        169        1.43       95.24
+{txt}         69 {c |}{res}        174        1.48       96.72
+{txt}         70 {c |}{res}        200        1.70       98.41
+{txt}         71 {c |}{res}        187        1.59      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     11,793      100.00
+
+{com}. tab id_dist
+
+{txt}group(distr {c |}
+       ict) {c |}      Freq.     Percent        Cum.
+{hline 12}{c +}{hline 35}
+          1 {c |}{res}         18        0.15        0.15
+{txt}          2 {c |}{res}         35        0.30        0.45
+{txt}          3 {c |}{res}         50        0.42        0.87
+{txt}          4 {c |}{res}         36        0.31        1.18
+{txt}          5 {c |}{res}         18        0.15        1.33
+{txt}          6 {c |}{res}         11        0.09        1.42
+{txt}          7 {c |}{res}         34        0.29        1.71
+{txt}          8 {c |}{res}         18        0.15        1.87
+{txt}          9 {c |}{res}         15        0.13        1.99
+{txt}         10 {c |}{res}         41        0.35        2.34
+{txt}         11 {c |}{res}         24        0.20        2.54
+{txt}         12 {c |}{res}         25        0.21        2.76
+{txt}         13 {c |}{res}         17        0.14        2.90
+{txt}         14 {c |}{res}         18        0.15        3.05
+{txt}         15 {c |}{res}          7        0.06        3.11
+{txt}         16 {c |}{res}         35        0.30        3.41
+{txt}         17 {c |}{res}          7        0.06        3.47
+{txt}         18 {c |}{res}         17        0.14        3.61
+{txt}         19 {c |}{res}         24        0.20        3.82
+{txt}         20 {c |}{res}         24        0.20        4.02
+{txt}         21 {c |}{res}          7        0.06        4.08
+{txt}         22 {c |}{res}          7        0.06        4.14
+{txt}         23 {c |}{res}         19        0.16        4.30
+{txt}         24 {c |}{res}         43        0.36        4.66
+{txt}         25 {c |}{res}         19        0.16        4.82
+{txt}         26 {c |}{res}         14        0.12        4.94
+{txt}         27 {c |}{res}          7        0.06        5.00
+{txt}         28 {c |}{res}          7        0.06        5.06
+{txt}         29 {c |}{res}         23        0.20        5.26
+{txt}         30 {c |}{res}         18        0.15        5.41
+{txt}         31 {c |}{res}         14        0.12        5.53
+{txt}         32 {c |}{res}         18        0.15        5.68
+{txt}         33 {c |}{res}         18        0.15        5.83
+{txt}         34 {c |}{res}         23        0.20        6.03
+{txt}         35 {c |}{res}         23        0.20        6.22
+{txt}         36 {c |}{res}         29        0.25        6.47
+{txt}         37 {c |}{res}         17        0.14        6.61
+{txt}         38 {c |}{res}         35        0.30        6.91
+{txt}         39 {c |}{res}         56        0.47        7.39
+{txt}         40 {c |}{res}         35        0.30        7.68
+{txt}         41 {c |}{res}         20        0.17        7.85
+{txt}         42 {c |}{res}         18        0.15        8.00
+{txt}         43 {c |}{res}         32        0.27        8.28
+{txt}         44 {c |}{res}         18        0.15        8.43
+{txt}         45 {c |}{res}         35        0.30        8.73
+{txt}         46 {c |}{res}          7        0.06        8.78
+{txt}         47 {c |}{res}         68        0.58        9.36
+{txt}         48 {c |}{res}         19        0.16        9.52
+{txt}         49 {c |}{res}          7        0.06        9.58
+{txt}         50 {c |}{res}         19        0.16        9.74
+{txt}         51 {c |}{res}         24        0.20        9.95
+{txt}         52 {c |}{res}         18        0.15       10.10
+{txt}         53 {c |}{res}          6        0.05       10.15
+{txt}         54 {c |}{res}         42        0.36       10.51
+{txt}         55 {c |}{res}         25        0.21       10.72
+{txt}         56 {c |}{res}         18        0.15       10.87
+{txt}         57 {c |}{res}         54        0.46       11.33
+{txt}         58 {c |}{res}         21        0.18       11.51
+{txt}         59 {c |}{res}         17        0.14       11.65
+{txt}         60 {c |}{res}          7        0.06       11.71
+{txt}         61 {c |}{res}         24        0.20       11.91
+{txt}         62 {c |}{res}         36        0.31       12.22
+{txt}         63 {c |}{res}         19        0.16       12.38
+{txt}         64 {c |}{res}         17        0.14       12.52
+{txt}         65 {c |}{res}         24        0.20       12.73
+{txt}         66 {c |}{res}         18        0.15       12.88
+{txt}         67 {c |}{res}         40        0.34       13.22
+{txt}         68 {c |}{res}         23        0.20       13.41
+{txt}         69 {c |}{res}         17        0.14       13.56
+{txt}         70 {c |}{res}         20        0.17       13.73
+{txt}         71 {c |}{res}          6        0.05       13.78
+{txt}         72 {c |}{res}         18        0.15       13.93
+{txt}         73 {c |}{res}         36        0.31       14.24
+{txt}         74 {c |}{res}          4        0.03       14.27
+{txt}         75 {c |}{res}         52        0.44       14.71
+{txt}         76 {c |}{res}         17        0.14       14.86
+{txt}         77 {c |}{res}         18        0.15       15.01
+{txt}         78 {c |}{res}         15        0.13       15.14
+{txt}         79 {c |}{res}         19        0.16       15.30
+{txt}         80 {c |}{res}         36        0.31       15.60
+{txt}         81 {c |}{res}         18        0.15       15.76
+{txt}         82 {c |}{res}         16        0.14       15.89
+{txt}         83 {c |}{res}         34        0.29       16.18
+{txt}         84 {c |}{res}         13        0.11       16.29
+{txt}         85 {c |}{res}          7        0.06       16.35
+{txt}         86 {c |}{res}         54        0.46       16.81
+{txt}         87 {c |}{res}         19        0.16       16.97
+{txt}         88 {c |}{res}         25        0.21       17.18
+{txt}         89 {c |}{res}          6        0.05       17.23
+{txt}         90 {c |}{res}         28        0.24       17.47
+{txt}         91 {c |}{res}         24        0.20       17.67
+{txt}         92 {c |}{res}         20        0.17       17.84
+{txt}         93 {c |}{res}         17        0.14       17.99
+{txt}         94 {c |}{res}         24        0.20       18.19
+{txt}         95 {c |}{res}         36        0.31       18.49
+{txt}         96 {c |}{res}         18        0.15       18.65
+{txt}         97 {c |}{res}          6        0.05       18.70
+{txt}         98 {c |}{res}         46        0.39       19.09
+{txt}         99 {c |}{res}         49        0.42       19.50
+{txt}        100 {c |}{res}         19        0.16       19.66
+{txt}        101 {c |}{res}         17        0.14       19.81
+{txt}        102 {c |}{res}         29        0.25       20.05
+{txt}        103 {c |}{res}         16        0.14       20.19
+{txt}        104 {c |}{res}         23        0.20       20.38
+{txt}        105 {c |}{res}          7        0.06       20.44
+{txt}        106 {c |}{res}          4        0.03       20.48
+{txt}        107 {c |}{res}         24        0.20       20.68
+{txt}        108 {c |}{res}         18        0.15       20.83
+{txt}        109 {c |}{res}          4        0.03       20.87
+{txt}        110 {c |}{res}         23        0.20       21.06
+{txt}        111 {c |}{res}         18        0.15       21.22
+{txt}        112 {c |}{res}         31        0.26       21.48
+{txt}        113 {c |}{res}         13        0.11       21.59
+{txt}        114 {c |}{res}         68        0.58       22.17
+{txt}        115 {c |}{res}         21        0.18       22.34
+{txt}        116 {c |}{res}         37        0.31       22.66
+{txt}        117 {c |}{res}         34        0.29       22.95
+{txt}        118 {c |}{res}          7        0.06       23.01
+{txt}        119 {c |}{res}          7        0.06       23.06
+{txt}        120 {c |}{res}          5        0.04       23.11
+{txt}        121 {c |}{res}         18        0.15       23.26
+{txt}        122 {c |}{res}         18        0.15       23.41
+{txt}        123 {c |}{res}         35        0.30       23.71
+{txt}        124 {c |}{res}          7        0.06       23.77
+{txt}        125 {c |}{res}         12        0.10       23.87
+{txt}        126 {c |}{res}         57        0.48       24.35
+{txt}        127 {c |}{res}         24        0.20       24.56
+{txt}        128 {c |}{res}         19        0.16       24.72
+{txt}        129 {c |}{res}         16        0.14       24.85
+{txt}        130 {c |}{res}         42        0.36       25.21
+{txt}        131 {c |}{res}         41        0.35       25.56
+{txt}        132 {c |}{res}         30        0.25       25.81
+{txt}        133 {c |}{res}         36        0.31       26.12
+{txt}        134 {c |}{res}         17        0.14       26.26
+{txt}        135 {c |}{res}         41        0.35       26.61
+{txt}        136 {c |}{res}          7        0.06       26.67
+{txt}        137 {c |}{res}         18        0.15       26.82
+{txt}        138 {c |}{res}         25        0.21       27.03
+{txt}        139 {c |}{res}          7        0.06       27.09
+{txt}        140 {c |}{res}         30        0.25       27.35
+{txt}        141 {c |}{res}         36        0.31       27.65
+{txt}        142 {c |}{res}         23        0.20       27.85
+{txt}        143 {c |}{res}         18        0.15       28.00
+{txt}        144 {c |}{res}          6        0.05       28.05
+{txt}        145 {c |}{res}         36        0.31       28.36
+{txt}        146 {c |}{res}         23        0.20       28.55
+{txt}        147 {c |}{res}         24        0.20       28.75
+{txt}        148 {c |}{res}         22        0.19       28.94
+{txt}        149 {c |}{res}         18        0.15       29.09
+{txt}        150 {c |}{res}         24        0.20       29.30
+{txt}        151 {c |}{res}         65        0.55       29.85
+{txt}        152 {c |}{res}         43        0.36       30.21
+{txt}        153 {c |}{res}         23        0.20       30.41
+{txt}        154 {c |}{res}          6        0.05       30.46
+{txt}        155 {c |}{res}         25        0.21       30.67
+{txt}        156 {c |}{res}         17        0.14       30.81
+{txt}        157 {c |}{res}         23        0.20       31.01
+{txt}        158 {c |}{res}         18        0.15       31.16
+{txt}        159 {c |}{res}         18        0.15       31.32
+{txt}        160 {c |}{res}         10        0.08       31.40
+{txt}        161 {c |}{res}         39        0.33       31.73
+{txt}        162 {c |}{res}         43        0.36       32.10
+{txt}        163 {c |}{res}         18        0.15       32.25
+{txt}        164 {c |}{res}         16        0.14       32.38
+{txt}        165 {c |}{res}         24        0.20       32.59
+{txt}        166 {c |}{res}         15        0.13       32.71
+{txt}        167 {c |}{res}         71        0.60       33.32
+{txt}        168 {c |}{res}         18        0.15       33.47
+{txt}        169 {c |}{res}         25        0.21       33.68
+{txt}        170 {c |}{res}         49        0.42       34.10
+{txt}        171 {c |}{res}         29        0.25       34.34
+{txt}        172 {c |}{res}         36        0.31       34.65
+{txt}        173 {c |}{res}          7        0.06       34.71
+{txt}        174 {c |}{res}         11        0.09       34.80
+{txt}        175 {c |}{res}         33        0.28       35.08
+{txt}        176 {c |}{res}         23        0.20       35.28
+{txt}        177 {c |}{res}         31        0.26       35.54
+{txt}        178 {c |}{res}         34        0.29       35.83
+{txt}        179 {c |}{res}         35        0.30       36.12
+{txt}        180 {c |}{res}         24        0.20       36.33
+{txt}        181 {c |}{res}         40        0.34       36.67
+{txt}        182 {c |}{res}         30        0.25       36.92
+{txt}        183 {c |}{res}         36        0.31       37.23
+{txt}        184 {c |}{res}          6        0.05       37.28
+{txt}        185 {c |}{res}         43        0.36       37.64
+{txt}        186 {c |}{res}         18        0.15       37.79
+{txt}        187 {c |}{res}          7        0.06       37.85
+{txt}        188 {c |}{res}         23        0.20       38.05
+{txt}        189 {c |}{res}         18        0.15       38.20
+{txt}        190 {c |}{res}         36        0.31       38.51
+{txt}        191 {c |}{res}         13        0.11       38.62
+{txt}        192 {c |}{res}         10        0.08       38.70
+{txt}        193 {c |}{res}         54        0.46       39.16
+{txt}        194 {c |}{res}         71        0.60       39.76
+{txt}        195 {c |}{res}         29        0.25       40.01
+{txt}        196 {c |}{res}          3        0.03       40.03
+{txt}        197 {c |}{res}         29        0.25       40.28
+{txt}        198 {c |}{res}          6        0.05       40.33
+{txt}        199 {c |}{res}         23        0.20       40.52
+{txt}        200 {c |}{res}          7        0.06       40.58
+{txt}        201 {c |}{res}         32        0.27       40.85
+{txt}        202 {c |}{res}          7        0.06       40.91
+{txt}        203 {c |}{res}         27        0.23       41.14
+{txt}        204 {c |}{res}         53        0.45       41.59
+{txt}        205 {c |}{res}         12        0.10       41.69
+{txt}        206 {c |}{res}         18        0.15       41.85
+{txt}        207 {c |}{res}         35        0.30       42.14
+{txt}        208 {c |}{res}         18        0.15       42.30
+{txt}        209 {c |}{res}         17        0.14       42.44
+{txt}        210 {c |}{res}         17        0.14       42.58
+{txt}        211 {c |}{res}          7        0.06       42.64
+{txt}        212 {c |}{res}          7        0.06       42.70
+{txt}        213 {c |}{res}         36        0.31       43.01
+{txt}        214 {c |}{res}         18        0.15       43.16
+{txt}        215 {c |}{res}          7        0.06       43.22
+{txt}        216 {c |}{res}          7        0.06       43.28
+{txt}        217 {c |}{res}         36        0.31       43.59
+{txt}        218 {c |}{res}         40        0.34       43.92
+{txt}        219 {c |}{res}          7        0.06       43.98
+{txt}        220 {c |}{res}         18        0.15       44.14
+{txt}        221 {c |}{res}         18        0.15       44.29
+{txt}        222 {c |}{res}          7        0.06       44.35
+{txt}        223 {c |}{res}         17        0.14       44.49
+{txt}        224 {c |}{res}         18        0.15       44.65
+{txt}        225 {c |}{res}         48        0.41       45.05
+{txt}        226 {c |}{res}         18        0.15       45.20
+{txt}        227 {c |}{res}         25        0.21       45.42
+{txt}        228 {c |}{res}          7        0.06       45.48
+{txt}        229 {c |}{res}         17        0.14       45.62
+{txt}        230 {c |}{res}         25        0.21       45.83
+{txt}        231 {c |}{res}         45        0.38       46.21
+{txt}        232 {c |}{res}         17        0.14       46.36
+{txt}        233 {c |}{res}          7        0.06       46.42
+{txt}        234 {c |}{res}         18        0.15       46.57
+{txt}        235 {c |}{res}          7        0.06       46.63
+{txt}        236 {c |}{res}         15        0.13       46.76
+{txt}        237 {c |}{res}         18        0.15       46.91
+{txt}        238 {c |}{res}          7        0.06       46.97
+{txt}        239 {c |}{res}         18        0.15       47.12
+{txt}        240 {c |}{res}         52        0.44       47.56
+{txt}        241 {c |}{res}         24        0.20       47.77
+{txt}        242 {c |}{res}         17        0.14       47.91
+{txt}        243 {c |}{res}         14        0.12       48.03
+{txt}        244 {c |}{res}         30        0.25       48.28
+{txt}        245 {c |}{res}          1        0.01       48.29
+{txt}        246 {c |}{res}         21        0.18       48.47
+{txt}        247 {c |}{res}         36        0.31       48.77
+{txt}        248 {c |}{res}         17        0.14       48.92
+{txt}        249 {c |}{res}         30        0.25       49.17
+{txt}        250 {c |}{res}         18        0.15       49.33
+{txt}        251 {c |}{res}         18        0.15       49.48
+{txt}        252 {c |}{res}         26        0.22       49.70
+{txt}        253 {c |}{res}          9        0.08       49.78
+{txt}        254 {c |}{res}         25        0.21       49.99
+{txt}        255 {c |}{res}         37        0.31       50.30
+{txt}        256 {c |}{res}         24        0.20       50.50
+{txt}        257 {c |}{res}         14        0.12       50.62
+{txt}        258 {c |}{res}         14        0.12       50.74
+{txt}        259 {c |}{res}          7        0.06       50.80
+{txt}        260 {c |}{res}          5        0.04       50.84
+{txt}        261 {c |}{res}          1        0.01       50.85
+{txt}        262 {c |}{res}         40        0.34       51.19
+{txt}        263 {c |}{res}         21        0.18       51.37
+{txt}        264 {c |}{res}         35        0.30       51.67
+{txt}        265 {c |}{res}         53        0.45       52.12
+{txt}        266 {c |}{res}         20        0.17       52.29
+{txt}        267 {c |}{res}          5        0.04       52.33
+{txt}        268 {c |}{res}         42        0.36       52.68
+{txt}        269 {c |}{res}         17        0.14       52.83
+{txt}        270 {c |}{res}          7        0.06       52.89
+{txt}        271 {c |}{res}         25        0.21       53.10
+{txt}        272 {c |}{res}         25        0.21       53.31
+{txt}        273 {c |}{res}         43        0.36       53.68
+{txt}        274 {c |}{res}          7        0.06       53.74
+{txt}        275 {c |}{res}         36        0.31       54.04
+{txt}        276 {c |}{res}         30        0.25       54.29
+{txt}        277 {c |}{res}         21        0.18       54.47
+{txt}        278 {c |}{res}         71        0.60       55.08
+{txt}        279 {c |}{res}         26        0.22       55.30
+{txt}        280 {c |}{res}         15        0.13       55.42
+{txt}        281 {c |}{res}         22        0.19       55.61
+{txt}        282 {c |}{res}         14        0.12       55.73
+{txt}        283 {c |}{res}         53        0.45       56.18
+{txt}        284 {c |}{res}         36        0.31       56.48
+{txt}        285 {c |}{res}         18        0.15       56.64
+{txt}        286 {c |}{res}         18        0.15       56.79
+{txt}        287 {c |}{res}         41        0.35       57.14
+{txt}        288 {c |}{res}         18        0.15       57.29
+{txt}        289 {c |}{res}         18        0.15       57.44
+{txt}        290 {c |}{res}         25        0.21       57.65
+{txt}        291 {c |}{res}         42        0.36       58.01
+{txt}        292 {c |}{res}         22        0.19       58.20
+{txt}        293 {c |}{res}         18        0.15       58.35
+{txt}        294 {c |}{res}         11        0.09       58.44
+{txt}        295 {c |}{res}         18        0.15       58.59
+{txt}        296 {c |}{res}         18        0.15       58.75
+{txt}        297 {c |}{res}         20        0.17       58.92
+{txt}        298 {c |}{res}         36        0.31       59.22
+{txt}        299 {c |}{res}         23        0.20       59.42
+{txt}        300 {c |}{res}         28        0.24       59.65
+{txt}        301 {c |}{res}         24        0.20       59.86
+{txt}        302 {c |}{res}         29        0.25       60.10
+{txt}        303 {c |}{res}         28        0.24       60.34
+{txt}        304 {c |}{res}         18        0.15       60.49
+{txt}        305 {c |}{res}         60        0.51       61.00
+{txt}        306 {c |}{res}         24        0.20       61.21
+{txt}        307 {c |}{res}         23        0.20       61.40
+{txt}        308 {c |}{res}         32        0.27       61.67
+{txt}        309 {c |}{res}         23        0.20       61.87
+{txt}        310 {c |}{res}          6        0.05       61.92
+{txt}        311 {c |}{res}         31        0.26       62.18
+{txt}        312 {c |}{res}         42        0.36       62.54
+{txt}        313 {c |}{res}         17        0.14       62.68
+{txt}        314 {c |}{res}         18        0.15       62.83
+{txt}        315 {c |}{res}         18        0.15       62.99
+{txt}        316 {c |}{res}         18        0.15       63.14
+{txt}        317 {c |}{res}         18        0.15       63.29
+{txt}        318 {c |}{res}         17        0.14       63.44
+{txt}        319 {c |}{res}         65        0.55       63.99
+{txt}        320 {c |}{res}         56        0.47       64.46
+{txt}        321 {c |}{res}         71        0.60       65.06
+{txt}        322 {c |}{res}         68        0.58       65.64
+{txt}        323 {c |}{res}         24        0.20       65.84
+{txt}        324 {c |}{res}         41        0.35       66.19
+{txt}        325 {c |}{res}         17        0.14       66.34
+{txt}        326 {c |}{res}         28        0.24       66.57
+{txt}        327 {c |}{res}         18        0.15       66.73
+{txt}        328 {c |}{res}         30        0.25       66.98
+{txt}        329 {c |}{res}          6        0.05       67.03
+{txt}        330 {c |}{res}         25        0.21       67.24
+{txt}        331 {c |}{res}         39        0.33       67.57
+{txt}        332 {c |}{res}          6        0.05       67.62
+{txt}        333 {c |}{res}         19        0.16       67.79
+{txt}        334 {c |}{res}         35        0.30       68.08
+{txt}        335 {c |}{res}         18        0.15       68.24
+{txt}        336 {c |}{res}         24        0.20       68.44
+{txt}        337 {c |}{res}         31        0.26       68.70
+{txt}        338 {c |}{res}         38        0.32       69.02
+{txt}        339 {c |}{res}         43        0.36       69.39
+{txt}        340 {c |}{res}         18        0.15       69.54
+{txt}        341 {c |}{res}          7        0.06       69.60
+{txt}        342 {c |}{res}         23        0.20       69.80
+{txt}        343 {c |}{res}          7        0.06       69.85
+{txt}        344 {c |}{res}         29        0.25       70.10
+{txt}        345 {c |}{res}         71        0.60       70.70
+{txt}        346 {c |}{res}         30        0.25       70.96
+{txt}        347 {c |}{res}         64        0.54       71.50
+{txt}        348 {c |}{res}         30        0.25       71.75
+{txt}        349 {c |}{res}         18        0.15       71.91
+{txt}        350 {c |}{res}         35        0.30       72.20
+{txt}        351 {c |}{res}         19        0.16       72.36
+{txt}        352 {c |}{res}         24        0.20       72.57
+{txt}        353 {c |}{res}         35        0.30       72.87
+{txt}        354 {c |}{res}         29        0.25       73.11
+{txt}        355 {c |}{res}         60        0.51       73.62
+{txt}        356 {c |}{res}         41        0.35       73.97
+{txt}        357 {c |}{res}         22        0.19       74.15
+{txt}        358 {c |}{res}          7        0.06       74.21
+{txt}        359 {c |}{res}         62        0.53       74.74
+{txt}        360 {c |}{res}         18        0.15       74.89
+{txt}        361 {c |}{res}         17        0.14       75.04
+{txt}        362 {c |}{res}         29        0.25       75.28
+{txt}        363 {c |}{res}         14        0.12       75.40
+{txt}        364 {c |}{res}         36        0.31       75.71
+{txt}        365 {c |}{res}         54        0.46       76.16
+{txt}        366 {c |}{res}         30        0.25       76.42
+{txt}        367 {c |}{res}         35        0.30       76.72
+{txt}        368 {c |}{res}         18        0.15       76.87
+{txt}        369 {c |}{res}          3        0.03       76.89
+{txt}        370 {c |}{res}         18        0.15       77.05
+{txt}        371 {c |}{res}         21        0.18       77.22
+{txt}        372 {c |}{res}          6        0.05       77.27
+{txt}        373 {c |}{res}         31        0.26       77.54
+{txt}        374 {c |}{res}          7        0.06       77.60
+{txt}        375 {c |}{res}          7        0.06       77.66
+{txt}        376 {c |}{res}         18        0.15       77.81
+{txt}        377 {c |}{res}         40        0.34       78.15
+{txt}        378 {c |}{res}         27        0.23       78.38
+{txt}        379 {c |}{res}         19        0.16       78.54
+{txt}        380 {c |}{res}         17        0.14       78.68
+{txt}        381 {c |}{res}         17        0.14       78.83
+{txt}        382 {c |}{res}         35        0.30       79.12
+{txt}        383 {c |}{res}         18        0.15       79.28
+{txt}        384 {c |}{res}         24        0.20       79.48
+{txt}        385 {c |}{res}         18        0.15       79.63
+{txt}        386 {c |}{res}         17        0.14       79.78
+{txt}        387 {c |}{res}         30        0.25       80.03
+{txt}        388 {c |}{res}         24        0.20       80.23
+{txt}        389 {c |}{res}         23        0.20       80.43
+{txt}        390 {c |}{res}         20        0.17       80.60
+{txt}        391 {c |}{res}         18        0.15       80.75
+{txt}        392 {c |}{res}         25        0.21       80.96
+{txt}        393 {c |}{res}         17        0.14       81.11
+{txt}        394 {c |}{res}         18        0.15       81.26
+{txt}        395 {c |}{res}         15        0.13       81.39
+{txt}        396 {c |}{res}          7        0.06       81.45
+{txt}        397 {c |}{res}         18        0.15       81.60
+{txt}        398 {c |}{res}         16        0.14       81.73
+{txt}        399 {c |}{res}         18        0.15       81.89
+{txt}        400 {c |}{res}         18        0.15       82.04
+{txt}        401 {c |}{res}         71        0.60       82.64
+{txt}        402 {c |}{res}         18        0.15       82.79
+{txt}        403 {c |}{res}         10        0.08       82.88
+{txt}        404 {c |}{res}         18        0.15       83.03
+{txt}        405 {c |}{res}         17        0.14       83.18
+{txt}        406 {c |}{res}         23        0.20       83.37
+{txt}        407 {c |}{res}         10        0.08       83.46
+{txt}        408 {c |}{res}         18        0.15       83.61
+{txt}        409 {c |}{res}         14        0.12       83.73
+{txt}        410 {c |}{res}         25        0.21       83.94
+{txt}        411 {c |}{res}         11        0.09       84.03
+{txt}        412 {c |}{res}         43        0.36       84.40
+{txt}        413 {c |}{res}         35        0.30       84.69
+{txt}        414 {c |}{res}         19        0.16       84.86
+{txt}        415 {c |}{res}         17        0.14       85.00
+{txt}        416 {c |}{res}         40        0.34       85.34
+{txt}        417 {c |}{res}         25        0.21       85.55
+{txt}        418 {c |}{res}          7        0.06       85.61
+{txt}        419 {c |}{res}         24        0.20       85.81
+{txt}        420 {c |}{res}         21        0.18       85.99
+{txt}        421 {c |}{res}         17        0.14       86.14
+{txt}        422 {c |}{res}         71        0.60       86.74
+{txt}        423 {c |}{res}         54        0.46       87.20
+{txt}        424 {c |}{res}         36        0.31       87.50
+{txt}        425 {c |}{res}          7        0.06       87.56
+{txt}        426 {c |}{res}          6        0.05       87.61
+{txt}        427 {c |}{res}         29        0.25       87.86
+{txt}        428 {c |}{res}         51        0.43       88.29
+{txt}        429 {c |}{res}          7        0.06       88.35
+{txt}        430 {c |}{res}         24        0.20       88.55
+{txt}        431 {c |}{res}         30        0.25       88.81
+{txt}        432 {c |}{res}          7        0.06       88.87
+{txt}        433 {c |}{res}         36        0.31       89.17
+{txt}        434 {c |}{res}         18        0.15       89.32
+{txt}        435 {c |}{res}         14        0.12       89.44
+{txt}        436 {c |}{res}         18        0.15       89.60
+{txt}        437 {c |}{res}         17        0.14       89.74
+{txt}        438 {c |}{res}         18        0.15       89.89
+{txt}        439 {c |}{res}         71        0.60       90.49
+{txt}        440 {c |}{res}         20        0.17       90.66
+{txt}        441 {c |}{res}         31        0.26       90.93
+{txt}        442 {c |}{res}         60        0.51       91.44
+{txt}        443 {c |}{res}         25        0.21       91.65
+{txt}        444 {c |}{res}         18        0.15       91.80
+{txt}        445 {c |}{res}         24        0.20       92.00
+{txt}        446 {c |}{res}         23        0.20       92.20
+{txt}        447 {c |}{res}         25        0.21       92.41
+{txt}        448 {c |}{res}         24        0.20       92.61
+{txt}        449 {c |}{res}         71        0.60       93.22
+{txt}        450 {c |}{res}         19        0.16       93.38
+{txt}        451 {c |}{res}         19        0.16       93.54
+{txt}        452 {c |}{res}         35        0.30       93.84
+{txt}        453 {c |}{res}         17        0.14       93.98
+{txt}        454 {c |}{res}          1        0.01       93.99
+{txt}        455 {c |}{res}          7        0.06       94.05
+{txt}        456 {c |}{res}         35        0.30       94.34
+{txt}        457 {c |}{res}         18        0.15       94.50
+{txt}        458 {c |}{res}         23        0.20       94.69
+{txt}        459 {c |}{res}          7        0.06       94.75
+{txt}        460 {c |}{res}         18        0.15       94.90
+{txt}        461 {c |}{res}         23        0.20       95.10
+{txt}        462 {c |}{res}         35        0.30       95.40
+{txt}        463 {c |}{res}         43        0.36       95.76
+{txt}        464 {c |}{res}         17        0.14       95.90
+{txt}        465 {c |}{res}         43        0.36       96.27
+{txt}        466 {c |}{res}         17        0.14       96.41
+{txt}        467 {c |}{res}          6        0.05       96.46
+{txt}        468 {c |}{res}         24        0.20       96.67
+{txt}        469 {c |}{res}         58        0.49       97.16
+{txt}        470 {c |}{res}         26        0.22       97.38
+{txt}        471 {c |}{res}         50        0.42       97.80
+{txt}        472 {c |}{res}         41        0.35       98.15
+{txt}        473 {c |}{res}         26        0.22       98.37
+{txt}        474 {c |}{res}         30        0.25       98.63
+{txt}        475 {c |}{res}         11        0.09       98.72
+{txt}        476 {c |}{res}         17        0.14       98.86
+{txt}        477 {c |}{res}         16        0.14       99.00
+{txt}        478 {c |}{res}          6        0.05       99.05
+{txt}        479 {c |}{res}         23        0.20       99.25
+{txt}        480 {c |}{res}          3        0.03       99.27
+{txt}        481 {c |}{res}         19        0.16       99.43
+{txt}        482 {c |}{res}         17        0.14       99.58
+{txt}        483 {c |}{res}         25        0.21       99.79
+{txt}        484 {c |}{res}         25        0.21      100.00
+{txt}{hline 12}{c +}{hline 35}
+      Total {c |}{res}     11,793      100.00
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe share_dist_date_relevant reformed , a(id_dist id_date) vce(cl id_state)
+{res}{err}variable {bf}share_dist_date_relevant{sf} not found
+{txt}{search r(111), local:r(111);}
+
+end of do-file
+
+{search r(111), local:r(111);}
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. gen share_dist_date_relevant = share_dist_date_factories+share_dist_date_mining+share_dist_date_plantation
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe share_dist_date_relevant reformed , a(id_dist id_date) vce(cl id_state)
+{res}{txt}(dropped 3 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 9 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res}    11,790
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      0.82
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.3750
+{txt}{col 51}R-squared{col 67}= {res}    0.6244
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.6059
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0014
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res}    0.1067
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}share_dist~t{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}  -.01934{col 26}{space 2} .0214094{col 37}{space 1}   -0.90{col 46}{space 3}0.375{col 54}{space 4}-.0634336{col 67}{space 3} .0247535
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .2217504{col 26}{space 2} .0029909{col 37}{space 1}   74.14{col 46}{space 3}0.000{col 54}{space 4} .2155906{col 67}{space 3} .2279102
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}     id_dist{col 14}{c |}{space 1}      481{col 27}{space 1}        0{col 39}{result}{space 1}      481{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        1{col 39}{result}{space 1}       70{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. use labor_reform_sample_Feb9ninght_distdate,replace
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe share_dist_date_factories reformed , a(id_dist id_date) vce(cl id_state)
+{res}{txt}(dropped 3 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 9 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res}    11,790
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      0.56
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.4595
+{txt}{col 51}R-squared{col 67}= {res}    0.5222
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.4988
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0012
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res}    0.0527
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}share_dist~s{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-.0088457{col 26}{space 2} .0117734{col 37}{space 1}   -0.75{col 46}{space 3}0.459{col 54}{space 4}-.0330935{col 67}{space 3} .0154021
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .0570696{col 26}{space 2}  .001567{col 37}{space 1}   36.42{col 46}{space 3}0.000{col 54}{space 4} .0538423{col 67}{space 3} .0602969
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}     id_dist{col 14}{c |}{space 1}      481{col 27}{space 1}        0{col 39}{result}{space 1}      481{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        1{col 39}{result}{space 1}       70{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe share_dist_date_mining reformed , a(id_dist id_date) vce(cl id_state)
+{res}{txt}(dropped 3 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 9 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res}    11,790
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      2.15
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.1550
+{txt}{col 51}R-squared{col 67}= {res}    0.4712
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.4452
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0010
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res}    0.0208
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}share_dist~g{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2} .0031338{col 26}{space 2} .0021372{col 37}{space 1}    1.47{col 46}{space 3}0.155{col 54}{space 4}-.0012678{col 67}{space 3} .0075354
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2}  .013275{col 26}{space 2} .0003071{col 37}{space 1}   43.23{col 46}{space 3}0.000{col 54}{space 4} .0126426{col 67}{space 3} .0139075
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}     id_dist{col 14}{c |}{space 1}      481{col 27}{space 1}        0{col 39}{result}{space 1}      481{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        1{col 39}{result}{space 1}       70{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe share_dist_date_plantation reformed , a(id_dist id_date) vce(cl id_state)
+{res}{txt}(dropped 3 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 9 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res}    11,790
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      1.12
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.2996
+{txt}{col 51}R-squared{col 67}= {res}    0.5720
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.5510
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0007
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res}    0.1106
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}share_dist~n{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-.0136281{col 26}{space 2} .0128653{col 37}{space 1}   -1.06{col 46}{space 3}0.300{col 54}{space 4}-.0401247{col 67}{space 3} .0128684
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .1514058{col 26}{space 2} .0018932{col 37}{space 1}   79.97{col 46}{space 3}0.000{col 54}{space 4} .1475066{col 67}{space 3}  .155305
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}     id_dist{col 14}{c |}{space 1}      481{col 27}{space 1}        0{col 39}{result}{space 1}      481{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        1{col 39}{result}{space 1}       70{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. use labor_reform_sample_Feb9ninght,replace
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe inc_all_source reformed , a(id id_date) vce(cl id_state)
+{res}{txt}(dropped 43484 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 14 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 4,532,059
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      0.12
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.7277
+{txt}{col 51}R-squared{col 67}= {res}    0.6508
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.6128
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0000
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res} 6220.2460
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inc_all_so~e{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2} 94.54644{col 26}{space 2} 268.5238{col 37}{space 1}    0.35{col 46}{space 3}0.728{col 54}{space 4}-458.4886{col 67}{space 3} 647.5815
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} 5630.472{col 26}{space 2}  39.2561{col 37}{space 1}  143.43{col 46}{space 3}0.000{col 54}{space 4} 5549.623{col 67}{space 3} 5711.322
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   445540{col 27}{space 1}   445540{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe inc_all_source reformed [pweight=mem_weight_w], a(id month_slot) vce(cl id_state)
+{res}{txt}(dropped 43484 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 13 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 4,532,059
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}     25{txt}){col 67}= {res}      0.01
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.9172
+{txt}{col 51}R-squared{col 67}= {res}    0.6059
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.5629
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0000
+{txt}{col 1}Number of clusters ({res}id_state{txt}) {col 30}= {res}        26{txt}{col 51}Root MSE{col 67}= {res} 5820.8903
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:26} clusters in id_state)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inc_all_so~e{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-43.46772{col 26}{space 2} 413.8349{col 37}{space 1}   -0.11{col 46}{space 3}0.917{col 54}{space 4}-895.7766{col 67}{space 3} 808.8411
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} 4787.163{col 26}{space 2} 56.03364{col 37}{space 1}   85.43{col 46}{space 3}0.000{col 54}{space 4} 4671.759{col 67}{space 3} 4902.566
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   445540{col 27}{space 1}   445540{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}  month_slot{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe inc_all_source reformed , a(id id_date) vce(cl id_dist)
+{res}{txt}(dropped 43484 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 14 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 4,532,059
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}    480{txt}){col 67}= {res}      0.09
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.7618
+{txt}{col 51}R-squared{col 67}= {res}    0.6508
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.6128
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0000
+{txt}{col 1}Number of clusters ({res}id_dist{txt}) {col 30}= {res}       481{txt}{col 51}Root MSE{col 67}= {res} 6220.2460
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:481} clusters in id_dist)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inc_all_so~e{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2} 94.54644{col 26}{space 2} 311.7094{col 37}{space 1}    0.30{col 46}{space 3}0.762{col 54}{space 4}-517.9372{col 67}{space 3}   707.03
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} 5630.472{col 26}{space 2} 45.56951{col 37}{space 1}  123.56{col 46}{space 3}0.000{col 54}{space 4} 5540.932{col 67}{space 3} 5720.013
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   445540{col 27}{space 1}   445540{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe inds_all_factories reformed , a(id id_date) vce(cl id_dist)
+{res}{txt}(dropped 107977 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 15 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 2,494,567
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}    480{txt}){col 67}= {res}      0.74
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.3915
+{txt}{col 51}R-squared{col 67}= {res}    0.3835
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.2989
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0000
+{txt}{col 1}Number of clusters ({res}id_dist{txt}) {col 30}= {res}       481{txt}{col 51}Root MSE{col 67}= {res}    0.2607
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:481} clusters in id_dist)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inds_all_f~s{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-.0085575{col 26}{space 2} .0099783{col 37}{space 1}   -0.86{col 46}{space 3}0.392{col 54}{space 4}-.0281641{col 67}{space 3} .0110491
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .1099678{col 26}{space 2} .0014028{col 37}{space 1}   78.39{col 46}{space 3}0.000{col 54}{space 4} .1072114{col 67}{space 3} .1127243
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   301007{col 27}{space 1}   301007{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. reghdfe inds_all_mining reformed , a(id id_date) vce(cl id_dist)
+{res}{txt}(dropped 107977 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 15 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 2,494,567
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}    480{txt}){col 67}= {res}      4.22
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.0404
+{txt}{col 51}R-squared{col 67}= {res}    0.3825
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.2977
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0001
+{txt}{col 1}Number of clusters ({res}id_dist{txt}) {col 30}= {res}       481{txt}{col 51}Root MSE{col 67}= {res}    0.1456
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:481} clusters in id_dist)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inds_all_m~g{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2} .0059245{col 26}{space 2} .0028825{col 37}{space 1}    2.06{col 46}{space 3}0.040{col 54}{space 4} .0002607{col 67}{space 3} .0115883
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .0303092{col 26}{space 2} .0004052{col 37}{space 1}   74.79{col 46}{space 3}0.000{col 54}{space 4} .0295129{col 67}{space 3} .0311054
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   301007{col 27}{space 1}   301007{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. reghdfe inds_all_plantation reformed , a(id id_date) vce(cl id_dist)
+{res}{txt}(dropped 107977 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 15 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 2,494,567
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}    480{txt}){col 67}= {res}      1.47
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.2262
+{txt}{col 51}R-squared{col 67}= {res}    0.6895
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.6468
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0000
+{txt}{col 1}Number of clusters ({res}id_dist{txt}) {col 30}= {res}       481{txt}{col 51}Root MSE{col 67}= {res}    0.2296
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:481} clusters in id_dist)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inds_all_p~n{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-.0075958{col 26}{space 2} .0062689{col 37}{space 1}   -1.21{col 46}{space 3}0.226{col 54}{space 4}-.0199137{col 67}{space 3} .0047222
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .1836659{col 26}{space 2} .0008813{col 37}{space 1}  208.40{col 46}{space 3}0.000{col 54}{space 4} .1819341{col 67}{space 3} .1853976
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   301007{col 27}{space 1}   301007{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe inds_all_mining reformed , a(id id_date) vce(cl id_dist)
+{res}{txt}(dropped 107977 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 15 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 2,494,567
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}    480{txt}){col 67}= {res}      4.22
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.0404
+{txt}{col 51}R-squared{col 67}= {res}    0.3825
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.2977
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0001
+{txt}{col 1}Number of clusters ({res}id_dist{txt}) {col 30}= {res}       481{txt}{col 51}Root MSE{col 67}= {res}    0.1456
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:481} clusters in id_dist)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inds_all_m~g{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2} .0059245{col 26}{space 2} .0028825{col 37}{space 1}    2.06{col 46}{space 3}0.040{col 54}{space 4} .0002607{col 67}{space 3} .0115883
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .0303092{col 26}{space 2} .0004052{col 37}{space 1}   74.79{col 46}{space 3}0.000{col 54}{space 4} .0295129{col 67}{space 3} .0311054
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   301007{col 27}{space 1}   301007{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do "/tmp/SD26097.000000"
+{txt}
+{com}. reghdfe inds_all_plantation reformed , a(id id_date) vce(cl id_dist)
+{res}{txt}(dropped 107977 {browse "http://scorreia.com/research/singletons.pdf":singleton observations})
+{res}{txt}({browse "http://scorreia.com/research/hdfe.pdf":MWFE estimator} converged in 15 iterations)
+{res}
+{txt}HDFE Linear regression{col 51}Number of obs{col 67}= {res} 2,494,567
+{txt}Absorbing 2 HDFE groups{col 51}F({res}   1{txt},{res}    480{txt}){col 67}= {res}      1.47
+{txt}Statistics robust to heteroskedasticity{col 51}Prob > F{col 67}= {res}    0.2262
+{txt}{col 51}R-squared{col 67}= {res}    0.6895
+{txt}{col 51}Adj R-squared{col 67}= {res}    0.6468
+{txt}{col 51}Within R-sq.{col 67}= {res}    0.0000
+{txt}{col 1}Number of clusters ({res}id_dist{txt}) {col 30}= {res}       481{txt}{col 51}Root MSE{col 67}= {res}    0.2296
+
+{txt}{ralign 78:(Std. Err. adjusted for {res:481} clusters in id_dist)}
+{hline 13}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 14}{c |}{col 26}    Robust
+{col 1}inds_all_p~n{col 14}{c |}      Coef.{col 26}   Std. Err.{col 38}      t{col 46}   P>|t|{col 54}     [95% Con{col 67}f. Interval]
+{hline 13}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{space 4}reformed {c |}{col 14}{res}{space 2}-.0075958{col 26}{space 2} .0062689{col 37}{space 1}   -1.21{col 46}{space 3}0.226{col 54}{space 4}-.0199137{col 67}{space 3} .0047222
+{txt}{space 7}_cons {c |}{col 14}{res}{space 2} .1836659{col 26}{space 2} .0008813{col 37}{space 1}  208.40{col 46}{space 3}0.000{col 54}{space 4} .1819341{col 67}{space 3} .1853976
+{txt}{hline 13}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}
+{txt}Absorbed degrees of freedom:
+{res}{col 1}{text}{hline 13}{c TT}{hline 12}{hline 12}{hline 14}{hline 1}{c TRC}
+{col 1}{text} Absorbed FE{col 14}{c |} Categories{col 27} - Redundant{col 39}  = Num. Coefs{col 54}{c |}
+{res}{col 1}{text}{hline 13}{c +}{hline 12}{hline 12}{hline 14}{hline 1}{c RT}
+{col 1}{text}          id{col 14}{c |}{space 1}   301007{col 27}{space 1}   301007{col 39}{result}{space 1}        0{col 53}{text}*{col 54}{c |}
+{res}{col 1}{text}     id_date{col 14}{c |}{space 1}       71{col 27}{space 1}        0{col 39}{result}{space 1}       71{col 53}{text} {col 54}{c |}
+{res}{col 1}{text}{hline 13}{c BT}{hline 12}{hline 12}{hline 14}{hline 1}{c BRC}
+* = FE nested within cluster; treated as redundant for DoF computation
+{res}{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. 
