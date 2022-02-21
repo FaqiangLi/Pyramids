@@ -4,7 +4,7 @@ clear
 set more off
 
 capture log close
-log using "/storage/work/f/fxl146/Pyramids/IDA_summarystat_01p.smcl", replace
+log using "/storage/work/f/fxl146/Pyramids/IDA_summarystat_trialexpost.smcl", replace
 
 
 * identifiers
@@ -13,11 +13,6 @@ log using "/storage/work/f/fxl146/Pyramids/IDA_summarystat_01p.smcl", replace
 // s : state i lives in 
 // d : district i lives in 
 // hr: homogenous region i lives in 
-
-* caveat
-// Aspirational India and consumption data have not incorporated in. They are at the household levels. 
-
-// note that people of india has every possible month because some households are asked in different month in a wave.
 
 
 ********************************************************************************
@@ -35,6 +30,7 @@ drop if state == "Andhra Pradesh" | state == "Jharkhand"  // around 6%
 
 * disaggregation level (income is at id-monthslot-month level)
 duplicates report id month_slot month
+duplicates report id month_slot 
 
 * reformat dates
 gen date=date(month_slot, "MY")
@@ -57,7 +53,7 @@ foreach var in inc_all_source inc_wages inc_pension inc_dividend inc_interest in
 	bysort id date: egen mean_`var' = mean(`var')
 }
 duplicates report id date
-bysort id (date_y date_m): keep if _n==1
+bysort id date: keep if _n==1
 
 
 * Drop students, and retired observation
@@ -67,9 +63,11 @@ gen temp_student = 1 if nature_of_occupation=="Student"
 bysort id (date_y date_m): egen temp_ever_student = sum(temp_student)
 gen temp_retired = 1 if nature_of_occupation=="Retired/Aged"
 bysort id (date_y date_m): egen temp_ever_retired = sum(temp_retired)
+
 drop if temp_ever_retired>0 | temp_ever_student>0
 drop temp_ever_retired temp_ever_student temp_student temp_retired
 // I don't drop home maker
+
 
 * regenerate some id (after having done all the sample selection)
 egen id_date = group(date_str)
@@ -81,6 +79,10 @@ egen id_dist= group(district)
 sort id hh_id mem_id date_y date_m id_date month_of_income
 order id hh_id mem_id date_y date_m id_date month_of_income
 
+
+* inspect data
+count
+codebook id
 
 ********************************************************************************
 ***********  Variable construction
@@ -110,7 +112,7 @@ qui tab inds, generate(inds)
 // not applicable
 rename inds25 inds_notapplicable
 
-///////// check missing !! do this later!!!!
+//CAVEAT: there could be missing variables !! do this later!!!!
 
 // factories
 rename inds2 inds_auto
@@ -122,6 +124,7 @@ rename inds21 inds_machinery
 rename inds28 inds_pharma
 rename inds34 inds_soap
 rename inds35 inds_textile
+
 local inds_factory_type inds_auto inds_construction inds_chemical inds_foodinds inds_leather inds_machinery inds_pharma inds_soap inds_textile
 egen temp_inds_all_factories = rowtotal(`inds_factory_type')
 gen inds_all_factories = 1 if temp_inds_all_factories>0 & inds_notapplicable~=1
@@ -136,6 +139,7 @@ rename inds14 inds_forestry
 rename inds15 inds_fruitveg
 rename inds29 inds_plantationcrop
 rename inds30 inds_poultry
+
 local inds_plantation_type inds_agriculture  inds_cropcultiv inds_fishing inds_forestry inds_fruitveg inds_plantationcrop inds_poultry
 egen temp_inds_all_plantation = rowtotal(`inds_plantation_type')
 gen inds_all_plantation = 1 if temp_inds_all_plantation>0 & inds_notapplicable~=1
@@ -146,6 +150,7 @@ drop temp_inds_all_plantation
 rename inds23 inds_metal
 rename inds24 inds_mines
 rename inds37 inds_utilities
+
 local inds_mining_type inds_metal inds_mines inds_utilities
 egen temp_inds_all_mining = rowtotal(`inds_mining_type')
 gen inds_all_mining = 1 if temp_inds_all_mining>0 & inds_notapplicable~=1
@@ -188,6 +193,9 @@ replace reformed = 1 if state == "Haryana" & ( (date_m >=3 & date_y==2016) | dat
 replace reformed = 1 if state == "Gujarat" &  ( (date_m >=9 & date_y==2020) | date_y>2020 )
 replace reformed = 1 if state == "Assam" &  ( (date_m >=9 & date_y==2017) | date_y>2017 )
 
+* treated states (this is a state level variable)
+gen state_ever_treated = 1 if inlist(state,"Maharashtra","Rajasthan","Madhya Pradesh","Haryana","Gujarat","Assam")
+
 * Ever-treated status of individual, if changed multiple times -- reflecting migration
 bysort id : egen temp_ever_reformed = sum(reformed)
 gen reformed_ever = temp_ever_reformed>0
@@ -205,21 +213,62 @@ replace reformed_changetwice = 1 if reformed_changetwice~=0
 tab reformed_changetwice
 
 * Reformed cross early affected industry (mine, planation,factory)
+// replace missing for not applicable
 gen reformedxinds = reformed*inds_relevant
+replace reformedxinds = 0 if reformedxinds==.
+gen reformedxinds_f = reformed*inds_all_factories
+replace reformedxinds_f = 0 if reformedxinds_f==.
+gen reformedxinds_m = reformed*inds_all_mining
+replace reformedxinds_m = 0 if reformedxinds_m==.
+gen reformedxinds_p = reformed*inds_all_plantation
+replace reformedxinds_p = 0 if reformedxinds_p==.
+
+* reframe the industry tags (there is no possibility of multiple industry)
+gen inds_reframe = -1  // this almost equals home maker
+replace inds_reframe = 1 if inds_all_factories==1
+replace inds_reframe = 2 if inds_all_mining==1
+replace inds_reframe = 3 if inds_all_plantation==1
+replace inds_reframe = 0 if inds_notrelevant==1
+
+* District level industry composition 
+bysort id_dist id_date: egen emp_dist_date_total = count(id)
+foreach type in plantation factories mining {
+	bysort id_dist id_date: egen emp_dist_date_`type' = sum(inds_all_`type')
+	gen share_dist_date_`type' = emp_dist_date_`type'/emp_dist_date_total
+}
+
+* state level composition 
+bysort id_state id_date: egen emp_state_date_total = count(id)
+foreach type in plantation factories mining {
+	bysort id_state id_date: egen emp_state_date_`type' = sum(inds_all_`type')
+	gen share_state_date_`type' = emp_state_date_`type'/emp_state_date_total
+}
+
+
+* District and state level industry employment transition of individuals, pre-post
+bysort id (id_date) : gen inds_reframe_lag = inds_reframe[_n-1]
+
+
+* (best way to show this is state by state by year, because some effects might wary overtime)
+* (group state by treatment and control group)
+
+
+save labor_reform_sample_Feb9ninght,replace
+
+
+**** mind the boundary cases. boundary at the treatment date
 
 ********************************************************************************
 *********** Summary stats: industry distribution and individual dynamics ******
 ********************************************************************************
 
-
-* industry distribution
+* distribution unconditional employment 
 tab inds
 tab inds_notapplicable
 tab inds_notrelevant
 tab inds_all_factories
 tab inds_all_mining
 tab inds_all_plantation
-
 
 ******** CAVEAT all of these are not weighted --- the actual representative distribution of India should be more scrutinized. 
 
@@ -228,28 +277,14 @@ tab inds_all_plantation
 // after deleting ever-students and ever-retired, 94% of the not applicable are homemaker
 tab nature if inds == "Not Applicable"
 
+* roughly industry employment distribution for the treated states
+tab state inds_reframe if state_ever_treated == 1
 
-* See the distribution of a cross section
-
-
-
-* Summary statistics of the industry
-
-
-
-* District level industry composition matrix (homogenous region is larger than district)
-bysort id_
-
-
-* Policy window district level transition matrix
-
-
-
-* 
+* Summary stats about the reform
 codebook reformed
 tab reformed
-tab state reformed  // basically we want both before and after treatment status for a state
-tab state reformed 
+tab state reformed  
+tab state reformed if state_ever_treated == 1
 local list_states_treated Maharashtra Rajasthan "Madhya Pradesh" Haryana Gujarat Assam
 foreach var in `list_states_treated'{
 	disp("*************************")
@@ -258,82 +293,71 @@ foreach var in `list_states_treated'{
 tab inds if state =="`var'"
 }
 
-save temp_data_Feb8ninght1p,replace
-log close
+
+******* Caveat: this needs to be done controlling for occupation: we don't care managers in factories's moving around. 
 
 
-* event study variable construction
-use temp_data_Feb2ninght1p,replace
 
-* Construct outcome variables
-// 1. first order effect, mobility
-// - across industries, so outcome is the transition probability (state/district level)
-// - individual separation or transition of jobs 
-// (indicator of unoccupied, indicator of choosing manufacturign occupation)
-// 2. 
-* I actually need a value label on the date, not
+* Transition
+tab inds_reframe_lag inds_reframe if reformed==1, row
+tab inds_reframe_lag inds_reframe if reformed==0, row
+tab inds_reframe_lag inds_reframe if reformed==1 & state_ever_treated==1, row
+tab inds_reframe_lag inds_reframe if reformed==0 & state_ever_treated==1, row
 
-* Today task 1: pick 3 outcomes to check reform regressions
-reghdfe inc_all_source reformed , a(id month_slot) vce(cl id_state)
+
+* Share trend overtime using collapsed-sample
+
+
+
+* check data range, type, missing
+codebook 
+
+
+
+********************************************************************************
+*********** Tests ******
+********************************************************************************
+
+* collapse to district level data
+use labor_reform_sample_Feb9ninght,replace
+duplicates drop  id_dist id_date, force
+sort id_dist id_date 
+order id_dist id_date
+save labor_reform_sample_Feb9ninght_distdate, replace
+
+* Distrct/state level did regression on employment share 
+// (note that reform is defined at the state and time level so duplicates drop will not give different district different treatment status)
+use labor_reform_sample_Feb9ninght_distdate,replace
+reghdfe share_dist_date_factories reformed , a(id_dist id_date) vce(cl id_state)
+reghdfe share_dist_date_mining reformed , a(id_dist id_date) vce(cl id_state)
+reghdfe share_dist_date_plantation reformed , a(id_dist id_date) vce(cl id_state)
+gen share_dist_date_relevant = share_dist_date_factories+share_dist_date_mining+share_dist_date_plantation
+reghdfe share_dist_date_relevant reformed , a(id_dist id_date) vce(cl id_state)
+
+/// (do I need to weight it...? and when collapsing, I also probably need to weight each district -- how to properly do that....(given that each individual is actually having weight))
+
+/// (need district tag from economic census on the rate of big firms!!!interacting that with reformed...)
+
+/// (later: try using event study specification (relative periods))
+
+* 
+use labor_reform_sample_Feb9ninght,replace
+
+* income
+reghdfe inc_all_source reformed , a(id id_date) vce(cl id_dist)
 reghdfe inc_all_source reformed [pweight=mem_weight_w], a(id month_slot) vce(cl id_state)
 
+* linear probability  (could it be more sophisticated?)
+reghdfe inds_all_factories reformed , a(id id_date) vce(cl id_dist)
+reghdfe inds_all_mining reformed , a(id id_date) vce(cl id_dist)
+reghdfe inds_all_plantation reformed , a(id id_date) vce(cl id_dist)
+
+reghdfe inc_all_source reformed [pweight=mem_weight_w], a(id month_slot) vce(cl id_state)
 
 
 * Today's task2: pick 3 outcomes to check and run the following regression and coefficient plot
 egen kkk = group(date_str)
 reg inc_all_source ib1.kkk if state == "Rajasthan", nocons
 coefplot   make it horizontal and add vertical line
-
-(try retain value label )
-
-
-// how to conveniently use date label as the value label 
-
-
-egen id_date = group(date)
-
-ciplot inc_all_source if state=="Maharashtra" 
- || ciplot inc_all_source if state=="Madhya Pradesh" , scheme(s1mono) by(date) xlabel(, angle(vertical))
-
-
-twoway fpfitci inc_all_source i.id_date
-
- || scatter mpg weight || , by(foreign, total row(1)) 
-
- ciplot inc_all_source if state=="Madhya Pradesh"
-
-
-
-* how should I use the weight 
-* how should I bunch dates so I don't get so many fluctuation. 
-
-
-
-* graph 1: time trend graph 
-
-
-by industry of job
-
-
-
-* graph 2, relative periods maybe 
-
-
-
-* DID
-areg var_outcome i.
-
-
-
-
-* graph 3, coefficient plot
-
-
-
-
-
-
-
-
 
 

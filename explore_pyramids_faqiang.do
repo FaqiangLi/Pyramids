@@ -2,8 +2,9 @@ clear all
 set more off
 capture ssc install fs
 capture ssc install carryforward
+set seed 123456
 
-capture log using "/storage/home/fxl146/work/Pyramids/carlos_1run" ,replace
+capture log using "/storage/home/fxl146/work/Pyramids/carlos_explore_event_study" ,replace
 
 capture cd "C:\Users\carlo\Dropbox\India_Dev"
 
@@ -109,7 +110,11 @@ replace month_slot="Oct "+substr(month_slot,1,4) if substr(month_slot,-3,.)=="m1
 replace month_slot="Nov "+substr(month_slot,1,4) if substr(month_slot,-3,.)=="m11"
 replace month_slot="Dec "+substr(month_slot,1,4) if substr(month_slot,-3,.)=="m12"
 
+
+* note that this is what we need to merge the income dataset
 gen month=month_slot
+
+* save
 cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
 save carlos_employment_1618,replace
 
@@ -119,7 +124,6 @@ duplicates drop
 
 cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
 save carlos_employment_1618_id, replace
-
 
 
 ********* income and expenditure
@@ -159,6 +163,17 @@ drop _merge
 
 cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
 save carlos_employment_income_1618,replace
+
+sample 10
+save carlos_employment_income_1618_10p,replace
+sample 10
+save carlos_employment_income_1618_1p,replace
+
+
+
+
+* Turn to explore_expense_merge_Carlos.do for directly the event study analysis
+
 
 
 
