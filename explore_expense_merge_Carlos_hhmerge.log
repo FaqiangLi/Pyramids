@@ -1,0 +1,386 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do explore_expense_merge_Carlos_hhmerge.do 
+
+. **** Expense merged with Carlos' datasets, summarizing employment status in t
+> he household level
+. 
+. clear
+
+. set more off
+
+. set seed 123456
+
+. 
+. * This script bases on Carlos Feb 15 latest script on event study. I didn't c
+> hange anything before his Feb 15 version and just merge in household variable
+> s for analysis 
+. 
+. * There is another script called explore_expense_merge_carlos.do  . That scri
+> pt merges monthly household expenditure with household heads' master dataset.
+>  This script first transform Carlos' datasets to household levels with summar
+> y variables on household income and emeployement status and then merge direct
+> ly with the monthly income data. 
+. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. use carlos_employment_income_1618,replace
+
+. /*
+> sample 10 
+> save carlos_employment_income_1618_10p, replace
+> sample 10 
+> save carlos_employment_income_1618_1p, replace
+> 
+> 
+> use temp_carlos_m_expense_1618,replace
+> sample 10 
+> save temp_carlos_m_expense_1618_10p, replace
+> sample 10 
+> save temp_carlos_m_expense_1618_1p, replace
+> */
+. 
+. 
+. * Feb23 note: Note that temp_carlos_m_expense_1618 include more years.
+. 
+. 
+. * sort and order
+. sort hh_id mem_id month_slot month
+
+. order id hh_id mem_id month_slot month
+
+. 
+. * add GST window
+. gen post=date_m>tm(2017m6)
+
+. forvalues k=0(1)6 {
+  2.         gen event_`k'=date_m==tm(2017m6)+`k'
+  3. }
+
+. forvalues k=1(1)6 {
+  2.         gen event_neg`k'=date_m==tm(2017m6)-`k'
+  3. }
+
+. gen aux=dofm(date_m)
+
+. gen year=year(aux)
+
+. drop aux
+
+. 
+. 
+. * recode nature of occupation
+. 
+. ta nature, gen(nature_)
+
+                   NATURE_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                  Agricultural Labourer |    339,426        5.26        5.26
+                            Businessman |    364,634        5.65       10.91
+                             Home Maker |    764,458       11.84       22.75
+                      Home-based Worker |     59,133        0.92       23.67
+                     Industrial Workers |    224,036        3.47       27.14
+    Legislator/Social Worker/ Activists |      3,582        0.06       27.19
+                                Manager |     15,990        0.25       27.44
+      Non-Industrial Technical Employee |    152,642        2.36       29.81
+                       Organised Farmer |    203,712        3.16       32.96
+  Qualified Self Employed Professionals |     23,963        0.37       33.33
+                           Retired/Aged |    284,500        4.41       37.74
+             Self Employed Entrepreneur |    692,604       10.73       48.47
+                           Small Farmer |    500,563        7.76       56.23
+Small Trader/Hawker/ Businessman with.. |    205,914        3.19       59.42
+                                Student |    329,695        5.11       64.53
+                          Support Staff |    528,921        8.19       72.72
+                             Unoccupied |     68,510        1.06       73.78
+                          Wage Labourer |  1,149,530       17.81       91.59
+        White Collar Clerical Employees |    280,694        4.35       95.94
+White-Collar Professional Employees a.. |    261,934        4.06      100.00
+----------------------------------------+-----------------------------------
+                                  Total |  6,454,441      100.00
+
+. 
+. rename nature_1 nature_agricultural
+
+. rename nature_2 nature_business
+
+. rename nature_3 nature_homemaker
+
+. rename nature_4 nature_homeworker
+
+. rename nature_5 nature_industrialw
+
+. rename nature_6 nature_legislatoretc
+
+. rename nature_7 nature_manager
+
+. rename nature_8 nature_nonindtechemp
+
+. rename nature_9 nature_orgfarmer
+
+. rename nature_10 nature_qualified
+
+. rename nature_11 nature_retired
+
+. rename nature_12 nature_self
+
+. rename nature_13 nature_smallfarmer
+
+. rename nature_14 nature_small
+
+. rename nature_15 nature_student
+
+. rename nature_16 nature_suppstaff
+
+. rename nature_17 nature_unoccupied
+
+. rename nature_18 nature_wage
+
+. rename nature_19 nature_whiteclerical
+
+. rename nature_20 nature_whiteprofesional
+
+. 
+. rename nature_of_occupation nature 
+
+. 
+. gen nature_all=nature_business==1|nature_industrialw==1|nature_qualified==1|n
+> ature_self==1|nature_small==1
+
+. 
+. 
+. * Generate income share within a households, by member
+. rename income_of_member_from_* inc_*
+
+. 
+. 
+. * Now construct income weight for each family member
+. foreach type in inc_all_source inc_wages inc_pension inc_dividend inc_interes
+> t inc_fd_pf_insu{
+  2.         bysort hh_id month_slot month: egen hh`type'=sum(`type')
+  3.         bysort hh_id month_slot month: gen share_hh`type'=`type'/hh`type'
+  4.         replace share_hh`type' = -1 if share_hh`type'==.
+  5.         disp("`type'")
+  6.         count if hh`type'==0
+  7. }
+(770,116 missing values generated)
+(770,116 real changes made)
+inc_all_source
+  770,116
+(870,291 missing values generated)
+(870,291 real changes made)
+inc_wages
+  870,291
+(6,201,656 missing values generated)
+(6,201,656 real changes made)
+inc_pension
+  6,201,656
+(6,452,999 missing values generated)
+(6,452,999 real changes made)
+inc_dividend
+  6,452,999
+(6,405,796 missing values generated)
+(6,405,796 real changes made)
+inc_interest
+  6,405,796
+(6,452,425 missing values generated)
+(6,452,425 real changes made)
+inc_fd_pf_insu
+  6,452,425
+
+. 
+. 
+. * tag the income by industry , and generate share by industry, wrt income fro
+> m all sources
+. foreach type in all business industrialw qualified self small{
+  2.         gen inc_indust_`type' = inc_all_source * nature_`type'
+  3.         
+.         bysort hh_id month_slot month: egen hhinctotal_`type'= sum(inc_indust
+> _`type' )
+  4.         gen hhincsh_`type' = hhinctotal_`type'/hhinc_all_source
+  5.         replace hhincsh_`type'=-1 if hhincsh_`type'==.
+  6. }
+(770,116 missing values generated)
+(770,116 real changes made)
+(770,116 missing values generated)
+(770,116 real changes made)
+(770,116 missing values generated)
+(770,116 real changes made)
+(770,116 missing values generated)
+(770,116 real changes made)
+(770,116 missing values generated)
+(770,116 real changes made)
+(770,116 missing values generated)
+(770,116 real changes made)
+
+. 
+. //
+. // * generate income share by industry of a household, wrt income from all so
+> urces, but this time time invariant using all pre-GST income.
+. // foreach type in all business industrialw qualified self small{
+. //      gen inc_indust_`type' = inc_all_source * nature_`type'
+. //      bysort hh_id month_slot month: egen hhinctotal_`type'= sum(inc_indust
+> _`type' )
+. //      gen hhincsh_`type' = hhinctotal_`type'/hhinc_all_source
+. //      replace hhincsh_`type'=-1 if hhincsh_`type'==.
+. // }
+. 
+. 
+. // CAVEAT: income of all sources might not be linked firmly to the nature of 
+> the occupation . 
+. 
+. * roughly in this sample, there are 170k households, two times the individual
+> s (because we exclude age<15, retired). Most of the households have one membe
+> r/two members (82%)
+. bysort hh_id month_slot month: gen order_mem = _n
+
+. bysort hh_id month_slot month: gen n_mem =_N
+
+. tab n_mem if order_mem==1
+
+      n_mem |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |  1,803,090       48.75       48.75
+          2 |  1,249,857       33.79       82.55
+          3 |    473,694       12.81       95.35
+          4 |    137,743        3.72       99.08
+          5 |     27,068        0.73       99.81
+          6 |      5,478        0.15       99.96
+          7 |      1,210        0.03       99.99
+          8 |        229        0.01      100.00
+          9 |         62        0.00      100.00
+         10 |         24        0.00      100.00
+         11 |         25        0.00      100.00
+------------+-----------------------------------
+      Total |  3,698,480      100.00
+
+. tab n_mem if order_mem==1 & substr(month,-4,4)=="2017"
+
+      n_mem |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |    729,766       48.82       48.82
+          2 |    504,006       33.72       82.54
+          3 |    191,042       12.78       95.32
+          4 |     55,855        3.74       99.06
+          5 |     11,068        0.74       99.80
+          6 |      2,277        0.15       99.95
+          7 |        557        0.04       99.99
+          8 |         91        0.01      100.00
+          9 |         28        0.00      100.00
+         10 |         15        0.00      100.00
+         11 |         12        0.00      100.00
+------------+-----------------------------------
+      Total |  1,494,717      100.00
+
+. hist share_hhinc_all_source  if substr(month,-4,4)=="2017"
+(bin=64, start=-1, width=.03125)
+
+. gen temp = round(mem_weight_ms)
+
+. hist share_hhinc_all_source [fweight=temp] if substr(month,-4,4)=="2017"
+(bin=97, start=-1, width=.02061856)
+
+. 
+. * family highest income (which member and the ammount) from all sources, time
+>  variant
+. gen highest_inc_share=.  // household specific
+(6,454,441 missing values generated)
+
+. gen highest_inc_who=.   // member specific
+(6,454,441 missing values generated)
+
+. bysort hh_id month_slot month: egen rank_hhinc_share = rank(-share_hhinc_all_
+> source) if n_mem > 1 & hhinc_all_source~=0
+(2,256,553 missing values generated)
+
+. // highest_inc_who
+. replace highest_inc_who = 1 if n_mem == 1 & hhinc_all_source~=0
+(1,486,437 real changes made)
+
+. replace highest_inc_who = 1 if rank_hhinc_share<2 & n_mem > 1 & hhinc_all_sou
+> rce~=0
+(1,784,764 real changes made)
+
+. replace highest_inc_who = 0 if rank_hhinc_share>=2 & n_mem > 1 & hhinc_all_so
+> urce~=0
+(2,413,124 real changes made)
+
+. replace highest_inc_who = 0 if hhinc_all_source==0
+(770,116 real changes made)
+
+. // highest_inc_share 
+. replace highest_inc_share = -1 if hhinc_all_source==0
+(770,116 real changes made)
+
+. replace highest_inc_share = 1 if n_mem == 1 & hhinc_all_source~=0
+(1,486,437 real changes made)
+
+. replace highest_inc_share =  share_hhinc_all_source if n_mem > 1 & hhinc_all_
+> source~=0 & highest_inc_who==1
+(1,784,764 real changes made)
+
+. bysort hh_id month_slot month: egen temp_inc = min(highest_inc_share) if n_me
+> m > 1 & hhinc_all_source~=0 
+(2,281,091 missing values generated)
+
+. replace highest_inc_share = temp_inc if n_mem > 1 & hhinc_all_source~=0 
+(2,388,586 real changes made)
+
+. codebook highest_inc_share
+
+-------------------------------------------------------------------------------
+highest_inc_share                                                   (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [-1,1]                       units:  1.000e-08
+         unique values:  28,092                   missing .:  24,538/6,454,441
+
+                  mean:   .577537
+              std. dev:   .624573
+
+           percentiles:        10%       25%       50%       75%       90%
+                                -1   .502183   .761905         1         1
+
+. codebook highest_inc_who
+
+-------------------------------------------------------------------------------
+highest_inc_who                                                     (unlabeled)
+-------------------------------------------------------------------------------
+
+                  type:  numeric (float)
+
+                 range:  [0,1]                        units:  1
+         unique values:  2                        missing .:  0/6,454,441
+
+            tabulation:  Freq.  Value
+                     3,183,240  0
+                     3,271,201  1
+
+. // check sanity
+. br hh_id mem_id share_hhinc_all_source rank_hhinc_share highest_inc_share if 
+> n_mem > 1 & hhinc_all_source~=0 
+command br is unrecognized
+r(199);
+
+end of do-file
+r(199);

@@ -1,0 +1,2172 @@
+
+  ___  ____  ____  ____  ____ (R)
+ /__    /   ____/   /   ____/
+___/   /   /___/   /   /___/   16.1   Copyright 1985-2019 StataCorp LLC
+  Statistics/Data analysis            StataCorp
+                                      4905 Lakeway Drive
+                                      College Station, Texas 77845 USA
+                                      800-STATA-PC        https://www.stata.com
+                                      979-696-4600        stata@stata.com
+                                      979-696-4601 (fax)
+
+Stata license: 5-user network, expiring 15 Nov 2022
+Serial number: 501709221209
+  Licensed to: The Pennsylvania State University - ICS-ACI
+               University Park
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+
+. do explore_expense_merge_Carlos.do 
+
+. **** Expense merged with Carlos' datasets, but only to household's head
+. 
+. clear
+
+. set more off
+
+. set seed 123456
+
+. 
+. * This script bases on Carlos Feb 15 latest script on event study. I didn't c
+> hange anything before his Feb 15 version and just merge in household variable
+> s for analysis 
+. 
+. * There is another script called explore_expense_merge_carlos_hhmerge.do  . T
+> his script merges monthly household expenditure with household heads' master 
+> dataset. The other script first transform Carlos' datasets to household level
+> s with summary variables on household income and emeployement status and then
+>  merge directly with the monthly income data. 
+. 
+. cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+/gpfs/scratch/fxl146/Pyramids_statafiles
+
+. use carlos_employment_income_1618_10p,replace
+
+. /*
+> sample 10 
+> save carlos_employment_income_1618_10p, replace
+> sample 10 
+> save carlos_employment_income_1618_1p, replace
+> 
+> 
+> use temp_carlos_m_expense_1618,replace
+> sample 10 
+> save temp_carlos_m_expense_1618_10p, replace
+> sample 10 
+> save temp_carlos_m_expense_1618_1p, replace
+> */
+. 
+. 
+. * Feb23 note: Note that temp_carlos_m_expense_1618 include more years.
+. 
+. * CAVEAT:think about weights when collapsing the dataset.
+. 
+. 
+. /*
+> How many are hoh (full Carlos sample)? Recall that in early days some obs are
+>  truncated out.
+> 
+>  tab relation_with_hoh
+> 
+>     RELATION_WITH_HOH |      Freq.     Percent        Cum.
+> ----------------------+-----------------------------------
+>               Brother |     50,963        0.79        0.79
+> Brother/Sister-in-law |      5,168        0.08        0.87
+>        Daugher-in-law |          4        0.00        0.87
+>              Daughter |    175,745        2.72        3.59
+>       Daughter-in-law |    138,141        2.14        5.73
+>         Domestic help |        382        0.01        5.74
+>                Friend |         64        0.00        5.74
+>            Grandchild |     46,827        0.73        6.47
+>                   HOH |  3,312,516       51.32       57.79
+>                 Inlaw |      1,363        0.02       57.81
+>   Other non-relatives |        156        0.00       57.81
+>                Parent |     43,710        0.68       58.49
+>              Relative |      8,929        0.14       58.63
+>                Sister |     11,133        0.17       58.80
+>                   Son |  1,949,801       30.21       89.01
+>            Son-in-law |     12,010        0.19       89.19
+>                Spouse |    697,529       10.81      100.00
+> ----------------------+-----------------------------------
+>                 Total |  6,454,441      100.00
+> 
+> This is the relationship of the member with the head of the household. One me
+> mber of the household is classified by the interviewer, as the head of the ho
+> usehold. This is usually the one who takes the most important decisions in th
+> e household. In many modern households such a classification of one individua
+> l as the head of the household is facile (flexible). Nevertheless, *one perso
+> n* of every household is classified as the head of the household. This is use
+> ful as it creates a reference for relationships within the household. All rel
+> ationships are with respect to the head of the household.            
+> 
+> Definition of hoh
+> */
+. 
+. sort hh_id mem_id month_slot month
+
+. order hh_id mem_id month_slot month
+
+. 
+. * check the stats of the head of the household
+. 
+. * confirmed: only one person is HOH per HH.
+. duplicates report hh_id mem_id month_slot month
+
+Duplicates in terms of hh_id mem_id month_slot month
+
+--------------------------------------
+   copies | observations       surplus
+----------+---------------------------
+        1 |       645444             0
+--------------------------------------
+
+. duplicates report hh_id month_slot month if relation_with_hoh=="HOH"
+
+Duplicates in terms of hh_id month_slot month
+
+--------------------------------------
+   copies | observations       surplus
+----------+---------------------------
+        1 |       331032             0
+--------------------------------------
+
+. 
+. * there are households not having hoh
+. gen temp1 = 1 if relation_with_hoh=="HOH"
+(314,412 missing values generated)
+
+. replace temp1 = 0 if relation_with_hoh~="HOH"
+(314,412 real changes made)
+
+. bysort hh_id: egen temp2=sum(temp1)  // no hoh in any point in time
+
+. codebook hh_id if temp2==0
+
+-------------------------------------------------------------------------------
+hh_id                                                                     HH_ID
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [10000111,99998892]          units:  1
+         unique values:  22,948                   missing .:  0/75,458
+
+                  mean:   5.1e+07
+              std. dev:   2.7e+07
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.5e+07   2.5e+07   5.1e+07   7.5e+07   9.0e+07
+
+. codebook hh_id if temp2~=0
+
+-------------------------------------------------------------------------------
+hh_id                                                                     HH_ID
+-------------------------------------------------------------------------------
+
+                  type:  numeric (long)
+
+                 range:  [10001060,99998893]          units:  1
+         unique values:  129,174                  missing .:  0/569,986
+
+                  mean:   5.1e+07
+              std. dev:   2.7e+07
+
+           percentiles:        10%       25%       50%       75%       90%
+                           1.5e+07   2.5e+07   5.0e+07   7.5e+07   9.0e+07
+
+. 
+. * what is the image of these hoh?
+. foreach char in gender religion caste caste_category literacy education disci
+> pline nature_of_occupation industry_of_occupation employment_status_since_yrs
+>  type_of_employment employment_arrangement time_to_start_working{
+  2.         tab `char' 
+  3.         tab `char' if relation_with_hoh=="HOH"
+  4.         /* one can roughly see the following pattern compared to the overa
+> ll population, the average HOH are more likely to be:male, to be tagged "not 
+> applicable" in discipline, to be , non-home-maker, full time.
+>         
+>         There is no difference in observation proportion in religion,caste gr
+> oup, education, employment arrangement.
+>         
+>         uncheck: caste , industry, employment_status_since_yrs, time to start
+>  working
+>         */
+. }
+
+            GENDER |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+                 F |    129,329       20.04       20.04
+                 M |    516,115       79.96      100.00
+-------------------+-----------------------------------
+             Total |    645,444      100.00
+
+            GENDER |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+                 F |     24,237        7.32        7.32
+                 M |    306,795       92.68      100.00
+-------------------+-----------------------------------
+             Total |    331,032      100.00
+
+           RELIGION |      Freq.     Percent        Cum.
+--------------------+-----------------------------------
+           Buddhist |      3,911        0.61        0.61
+          Christian |      8,936        1.38        1.99
+              Hindu |    550,385       85.27       87.26
+               Jain |      1,450        0.22       87.49
+              Khasi |         13        0.00       87.49
+             Muslim |     64,516       10.00       97.48
+     Not Applicable |          5        0.00       97.49
+     Other Religion |        111        0.02       97.50
+Religion not stated |        187        0.03       97.53
+               Sikh |     15,930        2.47      100.00
+--------------------+-----------------------------------
+              Total |    645,444      100.00
+
+           RELIGION |      Freq.     Percent        Cum.
+--------------------+-----------------------------------
+           Buddhist |      1,549        0.47        0.47
+          Christian |      4,271        1.29        1.76
+              Hindu |    282,493       85.34       87.10
+               Jain |        782        0.24       87.33
+              Khasi |          6        0.00       87.33
+             Muslim |     32,502        9.82       97.15
+     Not Applicable |          5        0.00       97.15
+     Other Religion |         42        0.01       97.17
+Religion not stated |         96        0.03       97.19
+               Sikh |      9,286        2.81      100.00
+--------------------+-----------------------------------
+              Total |    331,032      100.00
+
+                                  CASTE |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                              Ad Dharmi |        298        0.05        0.05
+                             Adi Andhra |         13        0.00        0.05
+                            Adi Dravida |      9,085        1.41        1.46
+                          Adi Karnataka |      2,214        0.34        1.80
+                      Ahir/Yadav/Gawali |      1,641        0.25        2.05
+            Ahir/Yadav/Gawali (Mazhabi) |         22        0.00        2.06
+                                   Ahom |        231        0.04        2.09
+                           Arora/Khatri |      2,184        0.34        2.43
+                          Arunthathiyar |        802        0.12        2.55
+                                  Asari |        719        0.11        2.67
+                 Ashraf (Sayyad Shaikh) |     15,648        2.42        5.09
+                                  Bagdi |      1,769        0.27        5.36
+                                  Baiga |         38        0.01        5.37
+                                 Bairwa |        748        0.12        5.49
+                               Bakarwal |          2        0.00        5.49
+                                 Balahi |      1,039        0.16        5.65
+                                  Balai |        394        0.06        5.71
+                                Balmiki |      4,941        0.77        6.47
+                                Banjara |        260        0.04        6.51
+                                Barnwal |         97        0.02        6.53
+                                  Bauri |      1,152        0.18        6.71
+                                Bazigar |        125        0.02        6.73
+                                 Bhambi |         11        0.00        6.73
+                                 Bhangi |        477        0.07        6.80
+                                Bhattra |          3        0.00        6.80
+                                   Bhil |      2,921        0.45        7.26
+                            Bhil/Vasava |      1,341        0.21        7.46
+                                 Bhogta |         81        0.01        7.48
+                               Bhottada |         13        0.00        7.48
+                                  Bhovi |        803        0.12        7.60
+                                 Bhuiya |        435        0.07        7.67
+                               Bhumihar |      1,713        0.27        7.94
+                                 Bhumij |         89        0.01        7.95
+                                 Bhuyan |          1        0.00        7.95
+                                   Bind |        234        0.04        7.99
+                         Bind (Mazhabi) |          4        0.00        7.99
+                                Bishnoi |         56        0.01        8.00
+                                   Boro |        164        0.03        8.02
+                                Brahmin |     38,198        5.92       13.94
+                                  Buksa |         13        0.00       13.94
+                                   Bunt |        308        0.05       13.99
+                       Caste not stated |     44,953        6.96       20.95
+                            Chakkiliyan |      1,456        0.23       21.18
+                                  Chama |        321        0.05       21.23
+                                 Chamar |     26,078        4.04       25.27
+                          Chamar/Bhambi |        859        0.13       25.40
+                                Chaupal |         34        0.01       25.41
+                               Cheruman |        182        0.03       25.44
+                               Chettiar |      1,848        0.29       25.72
+                     Chettiar (Mazhabi) |          1        0.00       25.72
+                           Chick-Baraik |          2        0.00       25.72
+                               Chodhari |        487        0.08       25.80
+                                  Dewar |        453        0.07       25.87
+                                 Dhanak |        567        0.09       25.96
+                                 Dhanuk |        175        0.03       25.98
+                       Dhanuk (Mazhabi) |          1        0.00       25.98
+                                  Dhoba |        383        0.06       26.04
+                                  Dhobi |      1,395        0.22       26.26
+                                 Dhodia |        180        0.03       26.29
+                                    Dom |        471        0.07       26.36
+                                   Doom |         20        0.00       26.36
+                                  Dubla |        226        0.04       26.40
+                                 Dusadh |      2,622        0.41       26.80
+                                 Edayar |         28        0.00       26.81
+             Edayars/Idiyans/Konars/Rao |        326        0.05       26.86
+                                Gaderia |      1,570        0.24       27.10
+                      Gaderia (Mazhabi) |          3        0.00       27.10
+                     Gaderia (Pasmanda) |          5        0.00       27.10
+                                  Gamit |        171        0.03       27.13
+                       Ganaks, Kayastha |      1,066        0.17       27.29
+                                  Ganda |        952        0.15       27.44
+                  Gawli, Dhangar, Yadav |      2,369        0.37       27.81
+        Gawli, Dhangar, Yadav (Mazhabi) |         16        0.00       27.81
+       Gawli, Dhangar, Yadav (Pasmanda) |         30        0.00       27.82
+                                  Ghasi |      1,332        0.21       28.02
+                                   Gond |      6,469        1.00       29.02
+                                Gounder |      1,546        0.24       29.26
+                            Gowda/Ediga |      2,167        0.34       29.60
+                  Gowda/Ediga (Mazhabi) |          8        0.00       29.60
+                 Gowda/Ediga (Pasmanda) |          8        0.00       29.60
+                                 Gujjar |      3,063        0.47       30.08
+                          Gujjar/Thevar |         70        0.01       30.09
+                                  Halba |        173        0.03       30.11
+                                 Halwai |        587        0.09       30.21
+                                Harijan |      1,979        0.31       30.51
+                                     Ho |         53        0.01       30.52
+                                 Holaya |        485        0.08       30.60
+                                 Irular |         14        0.00       30.60
+                         Jalia Kaibarta |         37        0.01       30.60
+                               Jannsari |         82        0.01       30.62
+                                    Jat |     12,080        1.87       32.49
+                                  Jhalo |          2        0.00       32.49
+                                 Julaha |         32        0.00       32.49
+                            Kabirpanthi |          4        0.00       32.49
+                                Kachari |         69        0.01       32.50
+                                  Kahar |      2,411        0.37       32.88
+                       Kahar (Pasmanda) |         15        0.00       32.88
+                              Kaibartta |        304        0.05       32.93
+                                 Kallar |      1,108        0.17       33.10
+                                 Kamboj |        162        0.03       33.12
+                                  Kamma |        929        0.14       33.27
+                                Kammari |        166        0.03       33.29
+                                Kamsali |        652        0.10       33.39
+                     Kamsali (Pasmanda) |          3        0.00       33.40
+                        Kanaura/Kinnara |          9        0.00       33.40
+                                 Kandra |        335        0.05       33.45
+                               Kannakan |        141        0.02       33.47
+                                 Kanwar |          4        0.00       33.47
+                                   Kapu |      1,469        0.23       33.70
+           Kapu, Balija, Telaga, Ontari |      2,072        0.32       34.02
+                                 Karana |        654        0.10       34.12
+                                Karmali |         44        0.01       34.13
+                           Kattunayakan |        136        0.02       34.15
+                                  Kawar |        441        0.07       34.22
+                               Kayastha |      9,164        1.42       35.64
+                      Kayastha & Brahma |         10        0.00       35.64
+                              Khandayat |      4,149        0.64       36.28
+                                Kharwar |         31        0.00       36.29
+                                 Khatik |      1,340        0.21       36.49
+                                Khatris |      4,777        0.74       37.23
+                                  Khond |        452        0.07       37.30
+                                  Kisan |          6        0.00       37.30
+                                   Koch |        208        0.03       37.34
+                                  Koeri |      2,274        0.35       37.69
+                                  Kokna |        421        0.07       37.75
+                                    Kol |        161        0.02       37.78
+                                  Kolha |         34        0.01       37.78
+                                   Koli |      2,972        0.46       38.25
+                              Koli Dhor |         17        0.00       38.25
+                           Koli Mahadev |      2,693        0.42       38.67
+                            Kondareddis |          2        0.00       38.67
+                         Kongu Vellarar |        924        0.14       38.81
+               Kongu Vellarar (Mazhabi) |          2        0.00       38.81
+                         Koppulu Velama |        737        0.11       38.92
+                                   Kora |         82        0.01       38.94
+                                   Kori |      2,008        0.31       39.25
+                                  Korku |        172        0.03       39.27
+                                   Koya |        748        0.12       39.39
+                              Kshatriya |        436        0.07       39.46
+                    Kshatriya (Mazhabi) |          3        0.00       39.46
+                                  Kunbi |      6,291        0.97       40.43
+                        Kunbi (Mazhabi) |          1        0.00       40.43
+                       Kunbi (Pasmanda) |          3        0.00       40.43
+                                Kuravan |         42        0.01       40.44
+                             Kurichchan |         10        0.00       40.44
+                                  Kurmi |      7,807        1.21       41.65
+                       Kurmi (Pasmanda) |          2        0.00       41.65
+                               Kurumans |         34        0.01       41.66
+                               Kushwaha |      1,470        0.23       41.88
+Kushwaha -- e.g., Koeri, Maurya, Kachhi |        954        0.15       42.03
+Kushwaha -- e.g., Koeri, Maurya, Kach.. |          6        0.00       42.03
+Kushwaha -- e.g., Koeri, Maurya, Kach.. |          1        0.00       42.03
+                               Lingayat |      6,620        1.03       43.06
+                                   Lodh |      1,744        0.27       43.33
+                         Lodh (Mazhabi) |          3        0.00       43.33
+                        Lodh (Pasmanda) |          6        0.00       43.33
+                                 Lohana |        352        0.05       43.38
+                                  Lohar |        743        0.12       43.50
+                       Lohar (Pasmanda) |         68        0.01       43.51
+                                  Lohra |         82        0.01       43.52
+                                 Madiga |      6,171        0.96       44.48
+                                  Mahar |     13,370        2.07       46.55
+                          Mahishya/Lodh |      1,180        0.18       46.73
+                Mahishya/Lodh (Mazhabi) |          1        0.00       46.73
+                             Mahisyadas |         48        0.01       46.74
+                      Mahyavansi/Vankar |      2,202        0.34       47.08
+                                   Mala |      4,542        0.70       47.79
+                           Malai Arayan |          4        0.00       47.79
+                               Malayali |         16        0.00       47.79
+                                   Mali |      5,080        0.79       48.58
+                         Mali (Mazhabi) |          4        0.00       48.58
+                                 Mallah |        608        0.09       48.67
+                                   Mang |      3,293        0.51       49.18
+                                Maratha |     20,101        3.11       52.29
+                          Maratha-Kunbi |        604        0.09       52.39
+                                 Marati |         90        0.01       52.40
+                               Maravars |        667        0.10       52.51
+                                 Maurya |        917        0.14       52.65
+                       Maurya (Mazhabi) |          1        0.00       52.65
+                      Maurya (Pasmanda) |          1        0.00       52.65
+                                Mazhabi |      2,417        0.37       53.02
+                                   Megh |      2,143        0.33       53.35
+                                Meghval |        510        0.08       53.43
+                                 Mehtar |        268        0.04       53.48
+                                  Mikir |         33        0.01       53.48
+                                   Mina |      1,861        0.29       53.77
+                                  Mochi |         32        0.00       53.77
+                               Mudaliar |      3,134        0.49       54.26
+                    Mudaliar (Pasmanda) |          2        0.00       54.26
+                          Mughal (Khan) |     10,953        1.70       55.96
+                                  Munda |        752        0.12       56.07
+                           Munnuru Kapu |      1,001        0.16       56.23
+                 Munnuru Kapu (Mazhabi) |          6        0.00       56.23
+                                Musahar |        345        0.05       56.28
+                             Mutharayar |      1,186        0.18       56.47
+                               Muthuvan |         60        0.01       56.48
+                                 Nadars |      1,316        0.20       56.68
+                      Nadars (Pasmanda) |          1        0.00       56.68
+                                  Naidu |      1,653        0.26       56.94
+                                 Naikda |      1,868        0.29       57.22
+                          Naikda/Nayaka |        327        0.05       57.28
+                                 Naiker |        965        0.15       57.43
+                      Naiker (Pasmanda) |          1        0.00       57.43
+                                   Nair |        905        0.14       57.57
+                              Namasudra |      3,138        0.49       58.05
+                                    Nat |          3        0.00       58.05
+                                 Nishad |      1,726        0.27       58.32
+                       Nishad (Mazhabi) |          9        0.00       58.32
+                      Nishad (Pasmanda) |          1        0.00       58.32
+                         Not Applicable |         18        0.00       58.32
+                                  Oraon |      1,035        0.16       58.48
+                              Other OBC |     50,338        7.80       66.28
+                    Other OBC (Mazhabi) |        125        0.02       66.30
+                   Other OBC (Pasmanda) |     16,956        2.63       68.93
+                               Other SC |     13,966        2.16       71.09
+                               Other ST |      6,547        1.01       72.11
+                     Other Upper Castes |      9,051        1.40       73.51
+                                 Pallan |      2,187        0.34       73.85
+                                    Pan |        618        0.10       73.94
+                                Paniyan |        109        0.02       73.96
+                                Pannadi |          4        0.00       73.96
+                               Paraiyan |      2,188        0.34       74.30
+                                   Pasi |      2,964        0.46       74.76
+                                  Patel |      1,165        0.18       74.94
+                          Patel/Patidar |      2,974        0.46       75.40
+                        Patels/Patidars |        124        0.02       75.42
+                                  Patni |        102        0.02       75.44
+                                 Pillai |      1,624        0.25       75.69
+                                    Pod |      1,954        0.30       75.99
+                              Prajapati |      1,630        0.25       76.24
+                   Prajapati (Pasmanda) |          3        0.00       76.24
+                                Pulayan |      1,538        0.24       76.48
+                                 Rabhar |         16        0.00       76.48
+                            Rai Bahadur |         12        0.00       76.49
+                                  Rajak |         11        0.00       76.49
+                              Rajbanshi |      3,208        0.50       76.99
+                                Rajbhar |         26        0.00       76.99
+                                Rajputs |     16,156        2.50       79.49
+                        Rajputs (Ghosh) |        380        0.06       79.55
+                        Rajputs/Darbars |      2,487        0.39       79.94
+                        Rajputs/Naicker |          4        0.00       79.94
+                                   Raju |        470        0.07       80.01
+                                 Rajwas |        130        0.02       80.03
+                                Rathawa |        750        0.12       80.15
+                                  Reddy |      3,368        0.52       80.67
+                               Sahariya |         33        0.01       80.67
+                                 Santal |      1,086        0.17       80.84
+                                Santhal |        920        0.14       80.98
+                                  Saora |        115        0.02       81.00
+                                  Savar |          2        0.00       81.00
+                                  Senai |         33        0.01       81.01
+                                  Senva |        153        0.02       81.03
+            Service OBC (Banjara, etc.) |        688        0.11       81.14
+  Service OBC (Banjara, etc.) (Mazhabi) |          2        0.00       81.14
+Service OBC (Dhobi, Nai, Penja, Baira.. |        391        0.06       81.20
+Service OBC (Dhobi, Nai, Penja, Baira.. |          5        0.00       81.20
+Service OBC (Dhobi, Nai, Penja, Baira.. |          2        0.00       81.20
+Service OBC (Ezhavas, Veluthedathu Na.. |      4,497        0.70       81.90
+Service OBC (Ezhavas, Veluthedathu Na.. |          4        0.00       81.90
+Service OBC (Ezhavas, Veluthedathu Na.. |         47        0.01       81.90
+Service OBC (Ghanchi/Vaghari/Dhobi/Na.. |      2,860        0.44       82.35
+Service OBC (Ghanchi/Vaghari/Dhobi/Na.. |         35        0.01       82.35
+Service OBC (Kewat, Dhobi, Nai/Napit,.. |        604        0.09       82.45
+Service OBC (Kewat, Dhobi, Nai/Napit,.. |         19        0.00       82.45
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |      9,237        1.43       83.88
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |         46        0.01       83.89
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |        122        0.02       83.91
+      Service OBC (Kewat/Nai/Teli/Jogi) |      3,002        0.47       84.37
+Service OBC (Kewat/Nai/Teli/Jogi) (Ma.. |          3        0.00       84.37
+Service OBC (Kewat/Nai/Teli/Jogi) (Pa.. |         59        0.01       84.38
+Service OBC (Meenavar, Dhobi, Nai, Pa.. |      1,469        0.23       84.61
+Service OBC (Meenavar, Dhobi, Nai, Pa.. |         10        0.00       84.61
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |      2,720        0.42       85.03
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |         10        0.00       85.03
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |        298        0.05       85.08
+Service OBC (Pallekari/Rajaka/Mangali.. |      2,783        0.43       85.51
+Service OBC (Pallekari/Rajaka/Mangali.. |         15        0.00       85.51
+Service OBC (Pallekari/Rajaka/Mangali.. |        186        0.03       85.54
+Service OBC (Teli, Nai/Napit/Dhobi(no.. |         24        0.00       85.55
+Service OBC (Teli, Nai/Napit/Dhobi(no.. |         30        0.00       85.55
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      1,808        0.28       85.83
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         16        0.00       85.83
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |          5        0.00       85.83
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      2,542        0.39       86.23
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         10        0.00       86.23
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         41        0.01       86.24
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      1,923        0.30       86.53
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |          3        0.00       86.53
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         57        0.01       86.54
+Service OBC (Teli/ Nai/Napit/Dhobi/Ke.. |        126        0.02       86.56
+Service OBC (Yogi/Chutiya/Dugla/Britt.. |        351        0.05       86.62
+Service OBC (Yogi/Chutiya/Dugla/Britt.. |          3        0.00       86.62
+ Service OBCs (Besta/Agasa/Hajama/etc.) |        962        0.15       86.77
+Service OBCs (Besta/Agasa/Hajama/etc... |          5        0.00       86.77
+Service OBCs (Besta/Agasa/Hajama/etc... |          3        0.00       86.77
+                                 Shabar |        483        0.07       86.84
+                               Shilpkar |         60        0.01       86.85
+                                  Sonar |        993        0.15       87.01
+                             Sourashtra |        374        0.06       87.06
+                                 Sugali |        179        0.03       87.09
+                                 Tamoli |        178        0.03       87.12
+                                   Teli |      1,501        0.23       87.35
+                        Teli (Pasmanda) |        275        0.04       87.39
+                                 Thakur |        541        0.08       87.48
+                                Thandan |         70        0.01       87.49
+                                  Tharu |          2        0.00       87.49
+                                 Thevar |      1,032        0.16       87.65
+                                Thigala |        365        0.06       87.70
+          Thondai Mandala Saiva Vellala |          6        0.00       87.71
+                                  Thori |         88        0.01       87.72
+                                  Thoti |          7        0.00       87.72
+                            Thurpu Kapu |        468        0.07       87.79
+                                Tripura |         15        0.00       87.80
+                                   Turi |        311        0.05       87.84
+                               Vadrangi |        313        0.05       87.89
+                    Vadrangi (Pasmanda) |          4        0.00       87.89
+                                Vadugar |        153        0.02       87.92
+                   Vaishya (Saha)/Bania |      1,098        0.17       88.09
+                    Vaishya-Vanis/Bania |         55        0.01       88.10
+                          Vaishya/Bania |     10,308        1.60       89.69
+                  Vaishya/Marwari/Bania |      2,933        0.45       90.15
+                  Vaisya, Komati, Bania |      1,748        0.27       90.42
+                                 Vannam |         44        0.01       90.42
+                               Vanniyar |      7,504        1.16       91.59
+                                  Varli |        345        0.05       91.64
+                                  Varma |         13        0.00       91.64
+                                 Velama |        420        0.07       91.71
+                               Vettuvan |          5        0.00       91.71
+                              Vokkaliga |      3,789        0.59       92.30
+                   Vokkaliga (Pasmanda) |          4        0.00       92.30
+                             Vokkalinga |         13        0.00       92.30
+                    Vyasa/Vaishya/Bania |        469        0.07       92.37
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |      4,280        0.66       93.03
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |         28        0.00       93.04
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |         75        0.01       93.05
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      2,289        0.35       93.40
+Weaver and Craftsmen OBC (Bunkar/Darz.. |          4        0.00       93.40
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         50        0.01       93.41
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      1,156        0.18       93.59
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         12        0.00       93.59
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         55        0.01       93.60
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      2,855        0.44       94.04
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         19        0.00       94.05
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        335        0.05       94.10
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        278        0.04       94.14
+Weaver and Craftsmen OBC (Bunkar/Darz.. |          7        0.00       94.14
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      1,725        0.27       94.41
+Weaver and Craftsmen OBC (Devanga/Dar.. |      3,592        0.56       94.97
+Weaver and Craftsmen OBC (Devanga/Dar.. |         11        0.00       94.97
+Weaver and Craftsmen OBC (Devanga/Dar.. |         29        0.00       94.97
+Weaver and Craftsmen OBC (Devanga/Kum.. |      2,138        0.33       95.30
+Weaver and Craftsmen OBC (Devanga/Kum.. |          9        0.00       95.31
+Weaver and Craftsmen OBC (Devanga/Kum.. |          3        0.00       95.31
+Weaver and Craftsmen OBC (Khati/Bunka.. |      1,587        0.25       95.55
+Weaver and Craftsmen OBC (Khati/Bunka.. |         27        0.00       95.56
+Weaver and Craftsmen OBC (Khati/Bunka.. |        132        0.02       95.58
+Weaver and Craftsmen OBC (Kumar/Namas.. |          3        0.00       95.58
+Weaver and Craftsmen OBC (Tanti/Malak.. |         25        0.00       95.58
+Weaver and Craftsmen OBC (Tanti/Malak.. |          1        0.00       95.58
+Weavers and Craftsmen OBC  (Gaderia, .. |      2,706        0.42       96.00
+Weavers and Craftsmen OBC (Devangas, .. |        965        0.15       96.15
+Weavers and Craftsmen OBC (Devangas, .. |          1        0.00       96.15
+Weavers and Craftsmen OBC (Devangas, .. |         11        0.00       96.15
+Weavers and Craftsmen OBC (Koshti, Pa.. |      1,749        0.27       96.42
+Weavers and Craftsmen OBC (Koshti, Pa.. |          3        0.00       96.42
+Weavers and Craftsmen OBC (Koshti, Pa.. |          8        0.00       96.42
+Weavers and Craftsmen OBC (Tanti, Bun.. |      1,078        0.17       96.59
+Weavers and Craftsmen OBC (Viswakarma.. |        446        0.07       96.66
+Weavers and Craftsmen OBC (Viswakarma.. |          1        0.00       96.66
+                                  Yadav |     14,915        2.31       98.97
+                        Yadav (Mazhabi) |          3        0.00       98.97
+                       Yadav (Pasmanda) |          3        0.00       98.97
+           Yadav/Ahir/Sadgop/Goala/Gope |        615        0.10       99.07
+ Yadav/Ahir/Sadgop/Goala/Gope (Mazhabi) |          1        0.00       99.07
+                    Yadava/Golla/Kuruma |      3,127        0.48       99.55
+         Yadava/Golla/Kuruma (Pasmanda) |         32        0.00       99.56
+                                 Yadavs |        755        0.12       99.67
+                       Yadavs (Mazhabi) |          8        0.00       99.68
+                      Yadavs (Pasmanda) |          1        0.00       99.68
+                                Yadhava |      1,455        0.23       99.90
+                                 Yenadi |        333        0.05       99.95
+                               Yerukula |        304        0.05      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+                                  CASTE |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                              Ad Dharmi |        192        0.06        0.06
+                             Adi Andhra |          5        0.00        0.06
+                            Adi Dravida |      3,631        1.10        1.16
+                          Adi Karnataka |        900        0.27        1.43
+                      Ahir/Yadav/Gawali |        854        0.26        1.69
+            Ahir/Yadav/Gawali (Mazhabi) |          9        0.00        1.69
+                                   Ahom |        131        0.04        1.73
+                           Arora/Khatri |      1,292        0.39        2.12
+                          Arunthathiyar |        297        0.09        2.21
+                                  Asari |        326        0.10        2.31
+                 Ashraf (Sayyad Shaikh) |      8,004        2.42        4.72
+                                  Bagdi |        798        0.24        4.97
+                                  Baiga |         15        0.00        4.97
+                                 Bairwa |        426        0.13        5.10
+                                 Balahi |        436        0.13        5.23
+                                  Balai |        208        0.06        5.29
+                                Balmiki |      2,603        0.79        6.08
+                                Banjara |        111        0.03        6.11
+                                Barnwal |         61        0.02        6.13
+                                  Bauri |        500        0.15        6.28
+                                Bazigar |         86        0.03        6.31
+                                 Bhambi |          5        0.00        6.31
+                                 Bhangi |        200        0.06        6.37
+                                Bhattra |          1        0.00        6.37
+                                   Bhil |      1,525        0.46        6.83
+                            Bhil/Vasava |        480        0.15        6.98
+                                 Bhogta |         49        0.01        6.99
+                               Bhottada |         10        0.00        6.99
+                                  Bhovi |        382        0.12        7.11
+                                 Bhuiya |        242        0.07        7.18
+                               Bhumihar |      1,043        0.32        7.50
+                                 Bhumij |         52        0.02        7.51
+                                 Bhuyan |          1        0.00        7.51
+                                   Bind |        165        0.05        7.56
+                         Bind (Mazhabi) |          2        0.00        7.56
+                                Bishnoi |         33        0.01        7.57
+                                   Boro |         90        0.03        7.60
+                                Brahmin |     20,670        6.24       13.85
+                                  Buksa |          6        0.00       13.85
+                                   Bunt |        155        0.05       13.89
+                       Caste not stated |     22,891        6.92       20.81
+                            Chakkiliyan |        539        0.16       20.97
+                                  Chama |        182        0.05       21.03
+                                 Chamar |     13,922        4.21       25.23
+                          Chamar/Bhambi |        369        0.11       25.34
+                                Chaupal |         25        0.01       25.35
+                               Cheruman |        101        0.03       25.38
+                               Chettiar |        897        0.27       25.65
+                     Chettiar (Mazhabi) |          1        0.00       25.65
+                               Chodhari |        160        0.05       25.70
+                                  Dewar |        277        0.08       25.79
+                                 Dhanak |        294        0.09       25.87
+                                 Dhanuk |         93        0.03       25.90
+                       Dhanuk (Mazhabi) |          1        0.00       25.90
+                                  Dhoba |        233        0.07       25.97
+                                  Dhobi |        818        0.25       26.22
+                                 Dhodia |         68        0.02       26.24
+                                    Dom |        259        0.08       26.32
+                                   Doom |         12        0.00       26.32
+                                  Dubla |         68        0.02       26.34
+                                 Dusadh |      1,617        0.49       26.83
+                                 Edayar |          8        0.00       26.83
+             Edayars/Idiyans/Konars/Rao |        185        0.06       26.89
+                                Gaderia |        872        0.26       27.15
+                      Gaderia (Mazhabi) |          1        0.00       27.15
+                                  Gamit |         71        0.02       27.18
+                       Ganaks, Kayastha |        478        0.14       27.32
+                                  Ganda |        488        0.15       27.47
+                  Gawli, Dhangar, Yadav |        938        0.28       27.75
+        Gawli, Dhangar, Yadav (Mazhabi) |          9        0.00       27.75
+       Gawli, Dhangar, Yadav (Pasmanda) |         17        0.01       27.76
+                                  Ghasi |        591        0.18       27.94
+                                   Gond |      2,694        0.81       28.75
+                                Gounder |        708        0.21       28.96
+                            Gowda/Ediga |      1,293        0.39       29.36
+                  Gowda/Ediga (Mazhabi) |          4        0.00       29.36
+                 Gowda/Ediga (Pasmanda) |          5        0.00       29.36
+                                 Gujjar |      1,774        0.54       29.89
+                          Gujjar/Thevar |         32        0.01       29.90
+                                  Halba |         79        0.02       29.93
+                                 Halwai |        409        0.12       30.05
+                                Harijan |        855        0.26       30.31
+                                     Ho |         35        0.01       30.32
+                                 Holaya |        212        0.06       30.38
+                                 Irular |         10        0.00       30.39
+                         Jalia Kaibarta |         21        0.01       30.39
+                               Jannsari |         40        0.01       30.41
+                                    Jat |      7,145        2.16       32.56
+                                  Jhalo |          1        0.00       32.56
+                                 Julaha |         23        0.01       32.57
+                            Kabirpanthi |          4        0.00       32.57
+                                Kachari |         38        0.01       32.58
+                                  Kahar |      1,267        0.38       32.97
+                       Kahar (Pasmanda) |          2        0.00       32.97
+                              Kaibartta |        128        0.04       33.01
+                                 Kallar |        520        0.16       33.16
+                                 Kamboj |        109        0.03       33.20
+                                  Kamma |        662        0.20       33.40
+                                Kammari |        102        0.03       33.43
+                                Kamsali |        452        0.14       33.56
+                     Kamsali (Pasmanda) |          1        0.00       33.56
+                        Kanaura/Kinnara |          7        0.00       33.57
+                                 Kandra |        228        0.07       33.63
+                               Kannakan |         68        0.02       33.66
+                                 Kanwar |          3        0.00       33.66
+                                   Kapu |        916        0.28       33.93
+           Kapu, Balija, Telaga, Ontari |      1,501        0.45       34.39
+                                 Karana |        385        0.12       34.50
+                                Karmali |         17        0.01       34.51
+                           Kattunayakan |         65        0.02       34.53
+                                  Kawar |        226        0.07       34.60
+                               Kayastha |      4,488        1.36       35.95
+                      Kayastha & Brahma |          7        0.00       35.95
+                              Khandayat |      2,740        0.83       36.78
+                                Kharwar |         16        0.00       36.79
+                                 Khatik |        713        0.22       37.00
+                                Khatris |      2,555        0.77       37.77
+                                  Khond |        244        0.07       37.85
+                                  Kisan |          2        0.00       37.85
+                                   Koch |        104        0.03       37.88
+                                  Koeri |      1,316        0.40       38.28
+                                  Kokna |        137        0.04       38.32
+                                    Kol |         79        0.02       38.34
+                                  Kolha |         19        0.01       38.35
+                                   Koli |      1,283        0.39       38.73
+                              Koli Dhor |          9        0.00       38.74
+                           Koli Mahadev |        955        0.29       39.03
+                         Kongu Vellarar |        442        0.13       39.16
+               Kongu Vellarar (Mazhabi) |          2        0.00       39.16
+                         Koppulu Velama |        491        0.15       39.31
+                                   Kora |         43        0.01       39.32
+                                   Kori |      1,054        0.32       39.64
+                                  Korku |         83        0.03       39.67
+                                   Koya |        410        0.12       39.79
+                              Kshatriya |        177        0.05       39.84
+                                  Kunbi |      2,640        0.80       40.64
+                       Kunbi (Pasmanda) |          2        0.00       40.64
+                                Kuravan |         19        0.01       40.65
+                             Kurichchan |          8        0.00       40.65
+                                  Kurmi |      4,460        1.35       42.00
+                               Kurumans |         13        0.00       42.00
+                               Kushwaha |        797        0.24       42.24
+Kushwaha -- e.g., Koeri, Maurya, Kachhi |        472        0.14       42.38
+Kushwaha -- e.g., Koeri, Maurya, Kach.. |          6        0.00       42.39
+Kushwaha -- e.g., Koeri, Maurya, Kach.. |          1        0.00       42.39
+                               Lingayat |      3,455        1.04       43.43
+                                   Lodh |        930        0.28       43.71
+                         Lodh (Mazhabi) |          1        0.00       43.71
+                        Lodh (Pasmanda) |          1        0.00       43.71
+                                 Lohana |        187        0.06       43.77
+                                  Lohar |        413        0.12       43.89
+                       Lohar (Pasmanda) |         27        0.01       43.90
+                                  Lohra |         44        0.01       43.91
+                                 Madiga |      3,094        0.93       44.85
+                                  Mahar |      5,350        1.62       46.46
+                          Mahishya/Lodh |        548        0.17       46.63
+                Mahishya/Lodh (Mazhabi) |          1        0.00       46.63
+                             Mahisyadas |         25        0.01       46.64
+                      Mahyavansi/Vankar |        937        0.28       46.92
+                                   Mala |      2,654        0.80       47.72
+                           Malai Arayan |          1        0.00       47.72
+                               Malayali |          7        0.00       47.72
+                                   Mali |      2,624        0.79       48.52
+                         Mali (Mazhabi) |          3        0.00       48.52
+                                 Mallah |        394        0.12       48.64
+                                   Mang |      1,173        0.35       48.99
+                                Maratha |      8,640        2.61       51.60
+                          Maratha-Kunbi |        231        0.07       51.67
+                                 Marati |         52        0.02       51.69
+                               Maravars |        291        0.09       51.78
+                                 Maurya |        482        0.15       51.92
+                      Maurya (Pasmanda) |          1        0.00       51.92
+                                Mazhabi |      1,445        0.44       52.36
+                                   Megh |      1,162        0.35       52.71
+                                Meghval |        225        0.07       52.78
+                                 Mehtar |        140        0.04       52.82
+                                  Mikir |         12        0.00       52.82
+                                   Mina |      1,173        0.35       53.18
+                                  Mochi |         17        0.01       53.18
+                               Mudaliar |      1,459        0.44       53.62
+                    Mudaliar (Pasmanda) |          1        0.00       53.62
+                          Mughal (Khan) |      5,773        1.74       55.37
+                                  Munda |        453        0.14       55.50
+                           Munnuru Kapu |        656        0.20       55.70
+                 Munnuru Kapu (Mazhabi) |          3        0.00       55.70
+                                Musahar |        235        0.07       55.77
+                             Mutharayar |        544        0.16       55.94
+                               Muthuvan |         27        0.01       55.95
+                                 Nadars |        633        0.19       56.14
+                      Nadars (Pasmanda) |          1        0.00       56.14
+                                  Naidu |        819        0.25       56.39
+                                 Naikda |        832        0.25       56.64
+                          Naikda/Nayaka |        133        0.04       56.68
+                                 Naiker |        411        0.12       56.80
+                      Naiker (Pasmanda) |          1        0.00       56.80
+                                   Nair |        484        0.15       56.95
+                              Namasudra |      1,436        0.43       57.38
+                                    Nat |          3        0.00       57.38
+                                 Nishad |        922        0.28       57.66
+                       Nishad (Mazhabi) |          5        0.00       57.66
+                         Not Applicable |         11        0.00       57.67
+                                  Oraon |        560        0.17       57.83
+                              Other OBC |     24,833        7.50       65.34
+                    Other OBC (Mazhabi) |         80        0.02       65.36
+                   Other OBC (Pasmanda) |      8,230        2.49       67.85
+                               Other SC |      7,365        2.22       70.07
+                               Other ST |      3,145        0.95       71.02
+                     Other Upper Castes |      4,608        1.39       72.41
+                                 Pallan |        896        0.27       72.68
+                                    Pan |        364        0.11       72.79
+                                Paniyan |         60        0.02       72.81
+                                Pannadi |          1        0.00       72.81
+                               Paraiyan |        893        0.27       73.08
+                                   Pasi |      1,738        0.53       73.61
+                                  Patel |        594        0.18       73.79
+                          Patel/Patidar |      1,502        0.45       74.24
+                        Patels/Patidars |         68        0.02       74.26
+                                  Patni |         45        0.01       74.27
+                                 Pillai |        782        0.24       74.51
+                                    Pod |        897        0.27       74.78
+                              Prajapati |        848        0.26       75.04
+                                Pulayan |        723        0.22       75.26
+                                 Rabhar |          6        0.00       75.26
+                            Rai Bahadur |          9        0.00       75.26
+                                  Rajak |          5        0.00       75.26
+                              Rajbanshi |      1,572        0.47       75.74
+                                Rajbhar |         21        0.01       75.74
+                                Rajputs |      9,394        2.84       78.58
+                        Rajputs (Ghosh) |        177        0.05       78.63
+                        Rajputs/Darbars |      1,111        0.34       78.97
+                        Rajputs/Naicker |          4        0.00       78.97
+                                   Raju |        277        0.08       79.06
+                                 Rajwas |         83        0.03       79.08
+                                Rathawa |        225        0.07       79.15
+                                  Reddy |      2,176        0.66       79.81
+                               Sahariya |          7        0.00       79.81
+                                 Santal |        579        0.17       79.98
+                                Santhal |        543        0.16       80.15
+                                  Saora |         62        0.02       80.17
+                                  Savar |          2        0.00       80.17
+                                  Senai |         17        0.01       80.17
+                                  Senva |         73        0.02       80.19
+            Service OBC (Banjara, etc.) |        275        0.08       80.28
+  Service OBC (Banjara, etc.) (Mazhabi) |          2        0.00       80.28
+Service OBC (Dhobi, Nai, Penja, Baira.. |        214        0.06       80.34
+Service OBC (Dhobi, Nai, Penja, Baira.. |          3        0.00       80.34
+Service OBC (Dhobi, Nai, Penja, Baira.. |          2        0.00       80.34
+Service OBC (Ezhavas, Veluthedathu Na.. |      2,513        0.76       81.10
+Service OBC (Ezhavas, Veluthedathu Na.. |          1        0.00       81.10
+Service OBC (Ezhavas, Veluthedathu Na.. |         25        0.01       81.11
+Service OBC (Ghanchi/Vaghari/Dhobi/Na.. |      1,291        0.39       81.50
+Service OBC (Ghanchi/Vaghari/Dhobi/Na.. |         18        0.01       81.51
+Service OBC (Kewat, Dhobi, Nai/Napit,.. |        292        0.09       81.59
+Service OBC (Kewat, Dhobi, Nai/Napit,.. |         10        0.00       81.60
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |      4,486        1.36       82.95
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |         32        0.01       82.96
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |         46        0.01       82.98
+      Service OBC (Kewat/Nai/Teli/Jogi) |      1,739        0.53       83.50
+Service OBC (Kewat/Nai/Teli/Jogi) (Ma.. |          2        0.00       83.50
+Service OBC (Kewat/Nai/Teli/Jogi) (Pa.. |         44        0.01       83.51
+Service OBC (Meenavar, Dhobi, Nai, Pa.. |        643        0.19       83.71
+Service OBC (Meenavar, Dhobi, Nai, Pa.. |         10        0.00       83.71
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |      1,483        0.45       84.16
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |          4        0.00       84.16
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |        161        0.05       84.21
+Service OBC (Pallekari/Rajaka/Mangali.. |      1,734        0.52       84.73
+Service OBC (Pallekari/Rajaka/Mangali.. |         12        0.00       84.74
+Service OBC (Pallekari/Rajaka/Mangali.. |        123        0.04       84.77
+Service OBC (Teli, Nai/Napit/Dhobi(no.. |         18        0.01       84.78
+Service OBC (Teli, Nai/Napit/Dhobi(no.. |         22        0.01       84.79
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      1,144        0.35       85.13
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         11        0.00       85.14
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |          5        0.00       85.14
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      1,267        0.38       85.52
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |          6        0.00       85.52
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         20        0.01       85.53
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      1,201        0.36       85.89
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |          1        0.00       85.89
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         31        0.01       85.90
+Service OBC (Teli/ Nai/Napit/Dhobi/Ke.. |         57        0.02       85.92
+Service OBC (Yogi/Chutiya/Dugla/Britt.. |        163        0.05       85.97
+Service OBC (Yogi/Chutiya/Dugla/Britt.. |          3        0.00       85.97
+ Service OBCs (Besta/Agasa/Hajama/etc.) |        446        0.13       86.10
+Service OBCs (Besta/Agasa/Hajama/etc... |          4        0.00       86.10
+Service OBCs (Besta/Agasa/Hajama/etc... |          1        0.00       86.10
+                                 Shabar |        237        0.07       86.18
+                               Shilpkar |         39        0.01       86.19
+                                  Sonar |        520        0.16       86.34
+                             Sourashtra |        176        0.05       86.40
+                                 Sugali |         89        0.03       86.42
+                                 Tamoli |         78        0.02       86.45
+                                   Teli |        815        0.25       86.69
+                        Teli (Pasmanda) |        116        0.04       86.73
+                                 Thakur |        205        0.06       86.79
+                                Thandan |         39        0.01       86.80
+                                  Tharu |          2        0.00       86.80
+                                 Thevar |        508        0.15       86.96
+                                Thigala |        174        0.05       87.01
+          Thondai Mandala Saiva Vellala |          1        0.00       87.01
+                                  Thori |         54        0.02       87.03
+                                  Thoti |          7        0.00       87.03
+                            Thurpu Kapu |        309        0.09       87.12
+                                Tripura |          6        0.00       87.12
+                                   Turi |        193        0.06       87.18
+                               Vadrangi |        187        0.06       87.24
+                    Vadrangi (Pasmanda) |          3        0.00       87.24
+                                Vadugar |         79        0.02       87.26
+                   Vaishya (Saha)/Bania |        483        0.15       87.41
+                    Vaishya-Vanis/Bania |         21        0.01       87.42
+                          Vaishya/Bania |      5,695        1.72       89.14
+                  Vaishya/Marwari/Bania |      1,805        0.55       89.68
+                  Vaisya, Komati, Bania |      1,354        0.41       90.09
+                                 Vannam |         22        0.01       90.10
+                               Vanniyar |      3,286        0.99       91.09
+                                  Varli |        115        0.03       91.12
+                                  Varma |          9        0.00       91.13
+                                 Velama |        296        0.09       91.22
+                               Vettuvan |          4        0.00       91.22
+                              Vokkaliga |      2,027        0.61       91.83
+                   Vokkaliga (Pasmanda) |          2        0.00       91.83
+                             Vokkalinga |          4        0.00       91.83
+                    Vyasa/Vaishya/Bania |        240        0.07       91.90
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |      2,235        0.68       92.58
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |         16        0.00       92.58
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |         29        0.01       92.59
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      1,053        0.32       92.91
+Weaver and Craftsmen OBC (Bunkar/Darz.. |          4        0.00       92.91
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         28        0.01       92.92
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        665        0.20       93.12
+Weaver and Craftsmen OBC (Bunkar/Darz.. |          8        0.00       93.12
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         26        0.01       93.13
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      1,657        0.50       93.63
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         12        0.00       93.64
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        194        0.06       93.69
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        133        0.04       93.73
+Weaver and Craftsmen OBC (Bunkar/Darz.. |          2        0.00       93.74
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        847        0.26       93.99
+Weaver and Craftsmen OBC (Devanga/Dar.. |      2,045        0.62       94.61
+Weaver and Craftsmen OBC (Devanga/Dar.. |          9        0.00       94.61
+Weaver and Craftsmen OBC (Devanga/Dar.. |         22        0.01       94.62
+Weaver and Craftsmen OBC (Devanga/Kum.. |      1,057        0.32       94.94
+Weaver and Craftsmen OBC (Devanga/Kum.. |          6        0.00       94.94
+Weaver and Craftsmen OBC (Devanga/Kum.. |          1        0.00       94.94
+Weaver and Craftsmen OBC (Khati/Bunka.. |        986        0.30       95.24
+Weaver and Craftsmen OBC (Khati/Bunka.. |         11        0.00       95.24
+Weaver and Craftsmen OBC (Khati/Bunka.. |         57        0.02       95.26
+Weaver and Craftsmen OBC (Tanti/Malak.. |         15        0.00       95.26
+Weaver and Craftsmen OBC (Tanti/Malak.. |          1        0.00       95.26
+Weavers and Craftsmen OBC  (Gaderia, .. |      1,554        0.47       95.73
+Weavers and Craftsmen OBC (Devangas, .. |        473        0.14       95.88
+Weavers and Craftsmen OBC (Devangas, .. |          1        0.00       95.88
+Weavers and Craftsmen OBC (Devangas, .. |          3        0.00       95.88
+Weavers and Craftsmen OBC (Koshti, Pa.. |        655        0.20       96.07
+Weavers and Craftsmen OBC (Koshti, Pa.. |          1        0.00       96.07
+Weavers and Craftsmen OBC (Koshti, Pa.. |          3        0.00       96.08
+Weavers and Craftsmen OBC (Tanti, Bun.. |        505        0.15       96.23
+Weavers and Craftsmen OBC (Viswakarma.. |        239        0.07       96.30
+Weavers and Craftsmen OBC (Viswakarma.. |          1        0.00       96.30
+                                  Yadav |      8,484        2.56       98.86
+                        Yadav (Mazhabi) |          2        0.00       98.86
+                       Yadav (Pasmanda) |          3        0.00       98.86
+           Yadav/Ahir/Sadgop/Goala/Gope |        328        0.10       98.96
+ Yadav/Ahir/Sadgop/Goala/Gope (Mazhabi) |          1        0.00       98.96
+                    Yadava/Golla/Kuruma |      1,887        0.57       99.53
+         Yadava/Golla/Kuruma (Pasmanda) |         18        0.01       99.54
+                                 Yadavs |        469        0.14       99.68
+                       Yadavs (Mazhabi) |          5        0.00       99.68
+                                Yadhava |        674        0.20       99.89
+                                 Yenadi |        195        0.06       99.95
+                               Yerukula |        181        0.05      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    331,032      100.00
+
+    CASTE_CATEGORY |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+Intermediate Caste |     64,269        9.96        9.96
+    Not Applicable |          5        0.00        9.96
+        Not Stated |      9,407        1.46       11.42
+               OBC |    248,489       38.50       49.91
+                SC |    141,907       21.99       71.90
+                ST |     37,869        5.87       77.77
+       Upper Caste |    143,498       22.23      100.00
+-------------------+-----------------------------------
+             Total |    645,444      100.00
+
+    CASTE_CATEGORY |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+Intermediate Caste |     34,414       10.40       10.40
+    Not Applicable |          5        0.00       10.40
+        Not Stated |      4,665        1.41       11.81
+               OBC |    127,791       38.60       50.41
+                SC |     69,710       21.06       71.47
+                ST |     17,652        5.33       76.80
+       Upper Caste |     76,795       23.20      100.00
+-------------------+-----------------------------------
+             Total |    331,032      100.00
+
+          LITERACY |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+                 N |     50,103        7.76        7.76
+                 Y |    595,341       92.24      100.00
+-------------------+-----------------------------------
+             Total |    645,444      100.00
+
+          LITERACY |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+                 N |     29,921        9.04        9.04
+                 Y |    301,111       90.96      100.00
+-------------------+-----------------------------------
+             Total |    331,032      100.00
+
+                   EDUCATION |      Freq.     Percent        Cum.
+-----------------------------+-----------------------------------
+              10th Std. Pass |    104,030       16.12       16.12
+              11th Std. Pass |     17,282        2.68       18.80
+              12th Std. Pass |     72,571       11.24       30.04
+               1st Std. Pass |     12,592        1.95       31.99
+               2nd Std. Pass |     11,496        1.78       33.77
+               3rd Std. Pass |     13,711        2.12       35.89
+               4th Std. Pass |     19,966        3.09       38.99
+               5th Std. Pass |     94,170       14.59       53.58
+               6th Std. Pass |     16,576        2.57       56.15
+               7th Std. Pass |     25,173        3.90       60.05
+               8th Std. Pass |     41,870        6.49       66.53
+               9th Std. Pass |     33,600        5.21       71.74
+Diploma / certificate course |      8,059        1.25       72.99
+                    Graduate |     85,604       13.26       86.25
+                No Education |     56,418        8.74       94.99
+               Ph.D / M.Phil |        269        0.04       95.03
+               Post Graduate |     32,057        4.97      100.00
+-----------------------------+-----------------------------------
+                       Total |    645,444      100.00
+
+                   EDUCATION |      Freq.     Percent        Cum.
+-----------------------------+-----------------------------------
+              10th Std. Pass |     62,195       18.79       18.79
+              11th Std. Pass |      2,555        0.77       19.56
+              12th Std. Pass |     31,132        9.40       28.96
+               1st Std. Pass |      7,980        2.41       31.38
+               2nd Std. Pass |      6,226        1.88       33.26
+               3rd Std. Pass |      7,508        2.27       35.52
+               4th Std. Pass |     11,040        3.34       38.86
+               5th Std. Pass |     66,706       20.15       59.01
+               6th Std. Pass |      6,915        2.09       61.10
+               7th Std. Pass |     11,145        3.37       64.47
+               8th Std. Pass |     19,846        6.00       70.46
+               9th Std. Pass |     11,540        3.49       73.95
+Diploma / certificate course |      2,468        0.75       74.69
+                    Graduate |     32,679        9.87       84.56
+                No Education |     34,924       10.55       95.11
+               Ph.D / M.Phil |        108        0.03       95.15
+               Post Graduate |     16,065        4.85      100.00
+-----------------------------+-----------------------------------
+                       Total |    331,032      100.00
+
+                             DISCIPLINE |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                            Agriculture |         17        0.00        0.00
+                           Architecture |        187        0.03        0.03
+                                   Arts |    125,268       19.41       19.44
+Ayurvedic Medicine/Yunani Medicine/Na.. |        110        0.02       19.46
+                               Commerce |     35,197        5.45       24.91
+Completed - Professional Courses (CA/.. |         15        0.00       24.91
+                   Computer Application |        763        0.12       25.03
+                                Dentist |         89        0.01       25.04
+                              Education |      1,061        0.16       25.21
+                            Engineering |      9,371        1.45       26.66
+        Fashion/Interior/Apparel Design |         42        0.01       26.67
+                              Fine Arts |        137        0.02       26.69
+                             Homeopathy |         88        0.01       26.70
+                       Hotel Management |        167        0.03       26.73
+Intermediate - Professional Courses (.. |          4        0.00       26.73
+                                    Law |      1,745        0.27       27.00
+          Management Studies in Finance |        250        0.04       27.04
+Management Studies in Human Resource .. |         89        0.01       27.05
+        Management Studies in Marketing |        125        0.02       27.07
+        Management Studies in Operation |         14        0.00       27.07
+           Management Studies in Others |        291        0.05       27.12
+              Mass Media/ Communication |         70        0.01       27.13
+                               Medicine |        649        0.10       27.23
+                         Not Applicable |    429,871       66.60       93.83
+                               Pharmacy |        313        0.05       93.88
+                          Physiotherapy |         41        0.01       93.88
+        Professional Courses(CA/CS/CFA) |        203        0.03       93.92
+                                Science |     39,224        6.08       99.99
+                     Veterinary Science |         43        0.01      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+                             DISCIPLINE |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                            Agriculture |          5        0.00        0.00
+                           Architecture |         54        0.02        0.02
+                                   Arts |     52,985       16.01       16.02
+Ayurvedic Medicine/Yunani Medicine/Na.. |         53        0.02       16.04
+                               Commerce |     11,595        3.50       19.54
+Completed - Professional Courses (CA/.. |          8        0.00       19.54
+                   Computer Application |        116        0.04       19.58
+                                Dentist |         28        0.01       19.59
+                              Education |        390        0.12       19.71
+                            Engineering |      2,464        0.74       20.45
+        Fashion/Interior/Apparel Design |          9        0.00       20.45
+                              Fine Arts |         43        0.01       20.47
+                             Homeopathy |         42        0.01       20.48
+                       Hotel Management |         23        0.01       20.49
+Intermediate - Professional Courses (.. |          2        0.00       20.49
+                                    Law |      1,120        0.34       20.82
+          Management Studies in Finance |         58        0.02       20.84
+Management Studies in Human Resource .. |         11        0.00       20.85
+        Management Studies in Marketing |         10        0.00       20.85
+        Management Studies in Operation |         10        0.00       20.85
+           Management Studies in Others |         61        0.02       20.87
+              Mass Media/ Communication |         22        0.01       20.88
+                               Medicine |        283        0.09       20.96
+                         Not Applicable |    246,133       74.35       95.32
+                               Pharmacy |         83        0.03       95.34
+                          Physiotherapy |         18        0.01       95.35
+        Professional Courses(CA/CS/CFA) |         61        0.02       95.36
+                                Science |     15,321        4.63       99.99
+                     Veterinary Science |         24        0.01      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    331,032      100.00
+
+                   NATURE_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                  Agricultural Labourer |     34,003        5.27        5.27
+                            Businessman |     36,232        5.61       10.88
+                             Home Maker |     76,509       11.85       22.74
+                      Home-based Worker |      5,769        0.89       23.63
+                     Industrial Workers |     22,358        3.46       27.09
+    Legislator/Social Worker/ Activists |        375        0.06       27.15
+                                Manager |      1,562        0.24       27.39
+      Non-Industrial Technical Employee |     15,349        2.38       29.77
+                       Organised Farmer |     20,291        3.14       32.92
+  Qualified Self Employed Professionals |      2,421        0.38       33.29
+                           Retired/Aged |     28,667        4.44       37.73
+             Self Employed Entrepreneur |     69,567       10.78       48.51
+                           Small Farmer |     49,965        7.74       56.25
+Small Trader/Hawker/ Businessman with.. |     20,432        3.17       59.42
+                                Student |     32,741        5.07       64.49
+                          Support Staff |     52,848        8.19       72.68
+                             Unoccupied |      6,867        1.06       73.74
+                          Wage Labourer |    115,316       17.87       91.61
+        White Collar Clerical Employees |     28,078        4.35       95.96
+White-Collar Professional Employees a.. |     26,094        4.04      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+                   NATURE_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                  Agricultural Labourer |     16,209        4.90        4.90
+                            Businessman |     24,267        7.33       12.23
+                             Home Maker |     11,063        3.34       15.57
+                      Home-based Worker |      2,377        0.72       16.29
+                     Industrial Workers |     11,045        3.34       19.62
+    Legislator/Social Worker/ Activists |        247        0.07       19.70
+                                Manager |        886        0.27       19.97
+      Non-Industrial Technical Employee |      6,823        2.06       22.03
+                       Organised Farmer |     13,786        4.16       26.19
+  Qualified Self Employed Professionals |      1,462        0.44       26.63
+                           Retired/Aged |     26,064        7.87       34.51
+             Self Employed Entrepreneur |     44,224       13.36       47.87
+                           Small Farmer |     36,736       11.10       58.96
+Small Trader/Hawker/ Businessman with.. |     13,924        4.21       63.17
+                                Student |         34        0.01       63.18
+                          Support Staff |     25,042        7.56       70.75
+                             Unoccupied |      2,197        0.66       71.41
+                          Wage Labourer |     67,581       20.42       91.82
+        White Collar Clerical Employees |     14,301        4.32       96.14
+White-Collar Professional Employees a.. |     12,764        3.86      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    331,032      100.00
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        800        0.12        0.12
+Automobiles and Other Transport Equip.. |      4,225        0.65        0.78
+Cement, Tiles, Bricks, Ceramics, Glas.. |      9,202        1.43        2.20
+                    Chemical Industries |      4,314        0.67        2.87
+          Communication, Post & Courier |      2,759        0.43        3.30
+                       Crop Cultivation |     93,814       14.53       17.83
+                       Defence Services |      1,867        0.29       18.12
+                              Education |     23,015        3.57       21.69
+               Entertainment and Sports |        737        0.11       21.80
+                     Financial Services |     10,392        1.61       23.41
+                                Fishing |      1,122        0.17       23.59
+                        Food Industries |      6,867        1.06       24.65
+  Footwear and other Leather Industries |      2,714        0.42       25.07
+        Forestry including Wood Cutting |        223        0.03       25.11
+           Fruits and Vegetable Farming |      6,772        1.05       26.16
+                       Gems & Jewellery |      2,653        0.41       26.57
+                  Handicraft Industries |      1,433        0.22       26.79
+                            Health Care |      6,345        0.98       27.77
+                 Hotels and Restaurants |      7,087        1.10       28.87
+                              IT & ITES |      4,651        0.72       29.59
+                Machinery Manufacturers |      5,103        0.79       30.38
+                   Media and Publishing |      1,371        0.21       30.59
+                       Metal Industries |     10,679        1.65       32.25
+                                  Mines |      2,422        0.38       32.62
+                         Not Applicable |    144,784       22.43       55.06
+     Personal Non-Professional Services |     39,583        6.13       61.19
+         Personal Professional Services |      2,236        0.35       61.53
+            Pharmaceutical Manufacturer |      1,794        0.28       61.81
+Poultry Farming, Animal Husbandry and.. |      1,913        0.30       62.11
+         Public Administrative Services |     18,282        2.83       64.94
+             Real Estate & Construction |     80,303       12.44       77.38
+                           Retail Trade |     87,931       13.62       91.01
+Soaps, Detergents, Cosmetics, Toiletr.. |      1,038        0.16       91.17
+                     Textile Industries |     16,731        2.59       93.76
+                     Travel and Tourism |     31,806        4.93       98.69
+                              Utilities |      3,313        0.51       99.20
+                        Wholesale Trade |      5,163        0.80      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        441        0.13        0.13
+Automobiles and Other Transport Equip.. |      1,708        0.52        0.65
+Cement, Tiles, Bricks, Ceramics, Glas.. |      5,373        1.62        2.27
+                    Chemical Industries |      1,819        0.55        2.82
+          Communication, Post & Courier |      1,167        0.35        3.17
+                       Crop Cultivation |     60,461       18.26       21.44
+                       Defence Services |        982        0.30       21.74
+                              Education |     10,994        3.32       25.06
+               Entertainment and Sports |        329        0.10       25.16
+                     Financial Services |      4,592        1.39       26.54
+                                Fishing |        706        0.21       26.76
+                        Food Industries |      3,622        1.09       27.85
+  Footwear and other Leather Industries |      1,242        0.38       28.23
+        Forestry including Wood Cutting |        122        0.04       28.26
+           Fruits and Vegetable Farming |      4,362        1.32       29.58
+                       Gems & Jewellery |      1,317        0.40       29.98
+                  Handicraft Industries |        830        0.25       30.23
+                            Health Care |      2,780        0.84       31.07
+                 Hotels and Restaurants |      3,990        1.21       32.27
+                              IT & ITES |        918        0.28       32.55
+                Machinery Manufacturers |      2,530        0.76       33.32
+                   Media and Publishing |        654        0.20       33.51
+                       Metal Industries |      5,640        1.70       35.22
+                                  Mines |      1,914        0.58       35.80
+                         Not Applicable |     39,358       11.89       47.68
+     Personal Non-Professional Services |     21,627        6.53       54.22
+         Personal Professional Services |      1,306        0.39       54.61
+            Pharmaceutical Manufacturer |        655        0.20       54.81
+Poultry Farming, Animal Husbandry and.. |        862        0.26       55.07
+         Public Administrative Services |     12,137        3.67       58.74
+             Real Estate & Construction |     49,372       14.91       73.65
+                           Retail Trade |     54,112       16.35       90.00
+Soaps, Detergents, Cosmetics, Toiletr.. |        519        0.16       90.15
+                     Textile Industries |      8,208        2.48       92.63
+                     Travel and Tourism |     19,319        5.84       98.47
+                              Utilities |      2,061        0.62       99.09
+                        Wholesale Trade |      3,003        0.91      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    331,032      100.00
+
+EMPLOYMENT_ |
+STATUS_SINC |
+      E_YRS |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       -100 |     10,070        1.56        1.56
+          0 |        563        0.09        1.65
+          1 |     21,118        3.27        4.92
+          2 |     33,627        5.21       10.13
+          3 |     22,431        3.48       13.60
+          4 |     17,864        2.77       16.37
+          5 |     34,736        5.38       21.75
+          6 |     16,187        2.51       24.26
+          7 |     11,936        1.85       26.11
+          8 |     22,075        3.42       29.53
+          9 |      6,372        0.99       30.52
+         10 |     38,912        6.03       36.55
+         11 |      4,464        0.69       37.24
+         12 |     21,913        3.40       40.63
+         13 |      7,275        1.13       41.76
+         14 |      7,963        1.23       42.99
+         15 |     37,815        5.86       48.85
+         16 |     10,494        1.63       50.48
+         17 |      8,829        1.37       51.85
+         18 |     19,714        3.05       54.90
+         19 |      6,017        0.93       55.83
+         20 |     50,349        7.80       63.63
+         21 |      6,153        0.95       64.59
+         22 |     18,894        2.93       67.51
+         23 |      9,482        1.47       68.98
+         24 |      9,531        1.48       70.46
+         25 |     39,125        6.06       76.52
+         26 |      8,763        1.36       77.88
+         27 |      7,331        1.14       79.02
+         28 |     11,596        1.80       80.81
+         29 |      3,329        0.52       81.33
+         30 |     31,466        4.88       86.20
+         31 |      2,269        0.35       86.55
+         32 |      8,853        1.37       87.93
+         33 |      3,415        0.53       88.46
+         34 |      3,637        0.56       89.02
+         35 |     15,882        2.46       91.48
+         36 |      3,663        0.57       92.05
+         37 |      2,975        0.46       92.51
+         38 |      5,445        0.84       93.35
+         39 |      1,482        0.23       93.58
+         40 |     11,882        1.84       95.42
+         41 |        982        0.15       95.57
+         42 |      3,509        0.54       96.12
+         43 |      1,444        0.22       96.34
+         44 |      1,261        0.20       96.54
+         45 |      5,037        0.78       97.32
+         46 |      1,144        0.18       97.49
+         47 |      1,143        0.18       97.67
+         48 |      1,746        0.27       97.94
+         49 |        472        0.07       98.02
+         50 |      3,331        0.52       98.53
+         51 |        319        0.05       98.58
+         52 |      1,238        0.19       98.77
+         53 |        599        0.09       98.87
+         54 |        630        0.10       98.96
+         55 |      1,680        0.26       99.22
+         56 |        652        0.10       99.32
+         57 |        521        0.08       99.41
+         58 |        909        0.14       99.55
+         59 |        267        0.04       99.59
+         60 |      2,652        0.41      100.00
+         61 |         11        0.00      100.00
+------------+-----------------------------------
+      Total |    645,444      100.00
+
+EMPLOYMENT_ |
+STATUS_SINC |
+      E_YRS |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       -100 |      4,340        1.31        1.31
+          0 |        322        0.10        1.41
+          1 |      6,213        1.88        3.29
+          2 |      9,729        2.94        6.22
+          3 |      6,203        1.87        8.10
+          4 |      4,934        1.49        9.59
+          5 |     12,823        3.87       13.46
+          6 |      5,768        1.74       15.20
+          7 |      4,616        1.39       16.60
+          8 |      9,371        2.83       19.43
+          9 |      2,811        0.85       20.28
+         10 |     20,050        6.06       26.34
+         11 |      2,312        0.70       27.03
+         12 |     12,097        3.65       30.69
+         13 |      4,146        1.25       31.94
+         14 |      4,700        1.42       33.36
+         15 |     22,877        6.91       40.27
+         16 |      5,632        1.70       41.97
+         17 |      4,816        1.45       43.43
+         18 |     10,658        3.22       46.65
+         19 |      2,976        0.90       47.55
+         20 |     32,290        9.75       57.30
+         21 |      3,030        0.92       58.22
+         22 |     11,210        3.39       61.60
+         23 |      5,304        1.60       63.20
+         24 |      5,537        1.67       64.88
+         25 |     27,085        8.18       73.06
+         26 |      5,476        1.65       74.71
+         27 |      4,702        1.42       76.13
+         28 |      7,343        2.22       78.35
+         29 |      2,042        0.62       78.97
+         30 |     21,772        6.58       85.55
+         31 |      1,316        0.40       85.94
+         32 |      5,302        1.60       87.55
+         33 |      1,823        0.55       88.10
+         34 |      1,985        0.60       88.70
+         35 |     10,495        3.17       91.87
+         36 |      1,876        0.57       92.43
+         37 |      1,603        0.48       92.92
+         38 |      2,714        0.82       93.74
+         39 |        741        0.22       93.96
+         40 |      7,072        2.14       96.10
+         41 |        407        0.12       96.22
+         42 |      1,457        0.44       96.66
+         43 |        535        0.16       96.82
+         44 |        436        0.13       96.95
+         45 |      2,578        0.78       97.73
+         46 |        399        0.12       97.85
+         47 |        429        0.13       97.98
+         48 |        613        0.19       98.17
+         49 |        187        0.06       98.22
+         50 |      1,569        0.47       98.70
+         51 |        115        0.03       98.73
+         52 |        434        0.13       98.86
+         53 |        206        0.06       98.93
+         54 |        249        0.08       99.00
+         55 |        738        0.22       99.22
+         56 |        302        0.09       99.32
+         57 |        232        0.07       99.39
+         58 |        392        0.12       99.50
+         59 |        140        0.04       99.55
+         60 |      1,499        0.45      100.00
+         61 |          3        0.00      100.00
+------------+-----------------------------------
+      Total |    331,032      100.00
+
+TYPE_OF_EMPLOYMENT |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+         Full-time |    494,398       76.60       76.60
+    Not Applicable |    146,108       22.64       99.24
+         Part-time |      4,936        0.76      100.00
+-------------------+-----------------------------------
+             Total |    645,442      100.00
+
+TYPE_OF_EMPLOYMENT |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+         Full-time |    272,485       82.31       82.31
+    Not Applicable |     56,222       16.98       99.30
+         Part-time |      2,325        0.70      100.00
+-------------------+-----------------------------------
+             Total |    331,032      100.00
+
+          EMPLOYMENT_ARRANGEMENT |      Freq.     Percent        Cum.
+---------------------------------+-----------------------------------
+Daily Wage worker/ Casual labour |    133,769       20.73       20.73
+                  Not Applicable |    146,108       22.64       43.36
+            Salaried - Permanent |     85,488       13.24       56.61
+            Salaried - Temporary |     63,245        9.80       66.41
+                   Self-employed |    216,832       33.59      100.00
+---------------------------------+-----------------------------------
+                           Total |    645,442      100.00
+
+          EMPLOYMENT_ARRANGEMENT |      Freq.     Percent        Cum.
+---------------------------------+-----------------------------------
+Daily Wage worker/ Casual labour |     70,712       21.36       21.36
+                  Not Applicable |     56,222       16.98       38.34
+            Salaried - Permanent |     48,307       14.59       52.94
+            Salaried - Temporary |     30,709        9.28       62.21
+                   Self-employed |    125,082       37.79      100.00
+---------------------------------+-----------------------------------
+                           Total |    331,032      100.00
+
+TIME_TO_START_WORK |
+               ING |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+         12 months |        971        0.15        0.15
+         18 months |        640        0.10        0.25
+ 24 months or more |      9,338        1.45        1.70
+          3 months |        380        0.06        1.76
+          6 months |        380        0.06        1.81
+          9 months |        213        0.03        1.85
+        Don't Know |     42,692        6.61        8.46
+             Never |     77,813       12.06       20.52
+    Not Applicable |    513,015       79.48      100.00
+-------------------+-----------------------------------
+             Total |    645,442      100.00
+
+TIME_TO_START_WORK |
+               ING |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+         12 months |        291        0.09        0.09
+         18 months |        212        0.06        0.15
+ 24 months or more |      3,140        0.95        1.10
+          3 months |        126        0.04        1.14
+          6 months |        130        0.04        1.18
+          9 months |         61        0.02        1.20
+        Don't Know |     15,539        4.69        5.89
+             Never |     31,227        9.43       15.32
+    Not Applicable |    280,306       84.68      100.00
+-------------------+-----------------------------------
+             Total |    331,032      100.00
+
+. foreach char in gender religion caste caste_category literacy education disci
+> pline nature_of_occupation industry_of_occupation employment_status_since_yrs
+>  type_of_employment employment_arrangement time_to_start_working{
+  2.         tab `char' 
+  3.         /*
+>         
+>         
+>         */
+. }
+
+            GENDER |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+                 F |    129,329       20.04       20.04
+                 M |    516,115       79.96      100.00
+-------------------+-----------------------------------
+             Total |    645,444      100.00
+
+           RELIGION |      Freq.     Percent        Cum.
+--------------------+-----------------------------------
+           Buddhist |      3,911        0.61        0.61
+          Christian |      8,936        1.38        1.99
+              Hindu |    550,385       85.27       87.26
+               Jain |      1,450        0.22       87.49
+              Khasi |         13        0.00       87.49
+             Muslim |     64,516       10.00       97.48
+     Not Applicable |          5        0.00       97.49
+     Other Religion |        111        0.02       97.50
+Religion not stated |        187        0.03       97.53
+               Sikh |     15,930        2.47      100.00
+--------------------+-----------------------------------
+              Total |    645,444      100.00
+
+                                  CASTE |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                              Ad Dharmi |        298        0.05        0.05
+                             Adi Andhra |         13        0.00        0.05
+                            Adi Dravida |      9,085        1.41        1.46
+                          Adi Karnataka |      2,214        0.34        1.80
+                      Ahir/Yadav/Gawali |      1,641        0.25        2.05
+            Ahir/Yadav/Gawali (Mazhabi) |         22        0.00        2.06
+                                   Ahom |        231        0.04        2.09
+                           Arora/Khatri |      2,184        0.34        2.43
+                          Arunthathiyar |        802        0.12        2.55
+                                  Asari |        719        0.11        2.67
+                 Ashraf (Sayyad Shaikh) |     15,648        2.42        5.09
+                                  Bagdi |      1,769        0.27        5.36
+                                  Baiga |         38        0.01        5.37
+                                 Bairwa |        748        0.12        5.49
+                               Bakarwal |          2        0.00        5.49
+                                 Balahi |      1,039        0.16        5.65
+                                  Balai |        394        0.06        5.71
+                                Balmiki |      4,941        0.77        6.47
+                                Banjara |        260        0.04        6.51
+                                Barnwal |         97        0.02        6.53
+                                  Bauri |      1,152        0.18        6.71
+                                Bazigar |        125        0.02        6.73
+                                 Bhambi |         11        0.00        6.73
+                                 Bhangi |        477        0.07        6.80
+                                Bhattra |          3        0.00        6.80
+                                   Bhil |      2,921        0.45        7.26
+                            Bhil/Vasava |      1,341        0.21        7.46
+                                 Bhogta |         81        0.01        7.48
+                               Bhottada |         13        0.00        7.48
+                                  Bhovi |        803        0.12        7.60
+                                 Bhuiya |        435        0.07        7.67
+                               Bhumihar |      1,713        0.27        7.94
+                                 Bhumij |         89        0.01        7.95
+                                 Bhuyan |          1        0.00        7.95
+                                   Bind |        234        0.04        7.99
+                         Bind (Mazhabi) |          4        0.00        7.99
+                                Bishnoi |         56        0.01        8.00
+                                   Boro |        164        0.03        8.02
+                                Brahmin |     38,198        5.92       13.94
+                                  Buksa |         13        0.00       13.94
+                                   Bunt |        308        0.05       13.99
+                       Caste not stated |     44,953        6.96       20.95
+                            Chakkiliyan |      1,456        0.23       21.18
+                                  Chama |        321        0.05       21.23
+                                 Chamar |     26,078        4.04       25.27
+                          Chamar/Bhambi |        859        0.13       25.40
+                                Chaupal |         34        0.01       25.41
+                               Cheruman |        182        0.03       25.44
+                               Chettiar |      1,848        0.29       25.72
+                     Chettiar (Mazhabi) |          1        0.00       25.72
+                           Chick-Baraik |          2        0.00       25.72
+                               Chodhari |        487        0.08       25.80
+                                  Dewar |        453        0.07       25.87
+                                 Dhanak |        567        0.09       25.96
+                                 Dhanuk |        175        0.03       25.98
+                       Dhanuk (Mazhabi) |          1        0.00       25.98
+                                  Dhoba |        383        0.06       26.04
+                                  Dhobi |      1,395        0.22       26.26
+                                 Dhodia |        180        0.03       26.29
+                                    Dom |        471        0.07       26.36
+                                   Doom |         20        0.00       26.36
+                                  Dubla |        226        0.04       26.40
+                                 Dusadh |      2,622        0.41       26.80
+                                 Edayar |         28        0.00       26.81
+             Edayars/Idiyans/Konars/Rao |        326        0.05       26.86
+                                Gaderia |      1,570        0.24       27.10
+                      Gaderia (Mazhabi) |          3        0.00       27.10
+                     Gaderia (Pasmanda) |          5        0.00       27.10
+                                  Gamit |        171        0.03       27.13
+                       Ganaks, Kayastha |      1,066        0.17       27.29
+                                  Ganda |        952        0.15       27.44
+                  Gawli, Dhangar, Yadav |      2,369        0.37       27.81
+        Gawli, Dhangar, Yadav (Mazhabi) |         16        0.00       27.81
+       Gawli, Dhangar, Yadav (Pasmanda) |         30        0.00       27.82
+                                  Ghasi |      1,332        0.21       28.02
+                                   Gond |      6,469        1.00       29.02
+                                Gounder |      1,546        0.24       29.26
+                            Gowda/Ediga |      2,167        0.34       29.60
+                  Gowda/Ediga (Mazhabi) |          8        0.00       29.60
+                 Gowda/Ediga (Pasmanda) |          8        0.00       29.60
+                                 Gujjar |      3,063        0.47       30.08
+                          Gujjar/Thevar |         70        0.01       30.09
+                                  Halba |        173        0.03       30.11
+                                 Halwai |        587        0.09       30.21
+                                Harijan |      1,979        0.31       30.51
+                                     Ho |         53        0.01       30.52
+                                 Holaya |        485        0.08       30.60
+                                 Irular |         14        0.00       30.60
+                         Jalia Kaibarta |         37        0.01       30.60
+                               Jannsari |         82        0.01       30.62
+                                    Jat |     12,080        1.87       32.49
+                                  Jhalo |          2        0.00       32.49
+                                 Julaha |         32        0.00       32.49
+                            Kabirpanthi |          4        0.00       32.49
+                                Kachari |         69        0.01       32.50
+                                  Kahar |      2,411        0.37       32.88
+                       Kahar (Pasmanda) |         15        0.00       32.88
+                              Kaibartta |        304        0.05       32.93
+                                 Kallar |      1,108        0.17       33.10
+                                 Kamboj |        162        0.03       33.12
+                                  Kamma |        929        0.14       33.27
+                                Kammari |        166        0.03       33.29
+                                Kamsali |        652        0.10       33.39
+                     Kamsali (Pasmanda) |          3        0.00       33.40
+                        Kanaura/Kinnara |          9        0.00       33.40
+                                 Kandra |        335        0.05       33.45
+                               Kannakan |        141        0.02       33.47
+                                 Kanwar |          4        0.00       33.47
+                                   Kapu |      1,469        0.23       33.70
+           Kapu, Balija, Telaga, Ontari |      2,072        0.32       34.02
+                                 Karana |        654        0.10       34.12
+                                Karmali |         44        0.01       34.13
+                           Kattunayakan |        136        0.02       34.15
+                                  Kawar |        441        0.07       34.22
+                               Kayastha |      9,164        1.42       35.64
+                      Kayastha & Brahma |         10        0.00       35.64
+                              Khandayat |      4,149        0.64       36.28
+                                Kharwar |         31        0.00       36.29
+                                 Khatik |      1,340        0.21       36.49
+                                Khatris |      4,777        0.74       37.23
+                                  Khond |        452        0.07       37.30
+                                  Kisan |          6        0.00       37.30
+                                   Koch |        208        0.03       37.34
+                                  Koeri |      2,274        0.35       37.69
+                                  Kokna |        421        0.07       37.75
+                                    Kol |        161        0.02       37.78
+                                  Kolha |         34        0.01       37.78
+                                   Koli |      2,972        0.46       38.25
+                              Koli Dhor |         17        0.00       38.25
+                           Koli Mahadev |      2,693        0.42       38.67
+                            Kondareddis |          2        0.00       38.67
+                         Kongu Vellarar |        924        0.14       38.81
+               Kongu Vellarar (Mazhabi) |          2        0.00       38.81
+                         Koppulu Velama |        737        0.11       38.92
+                                   Kora |         82        0.01       38.94
+                                   Kori |      2,008        0.31       39.25
+                                  Korku |        172        0.03       39.27
+                                   Koya |        748        0.12       39.39
+                              Kshatriya |        436        0.07       39.46
+                    Kshatriya (Mazhabi) |          3        0.00       39.46
+                                  Kunbi |      6,291        0.97       40.43
+                        Kunbi (Mazhabi) |          1        0.00       40.43
+                       Kunbi (Pasmanda) |          3        0.00       40.43
+                                Kuravan |         42        0.01       40.44
+                             Kurichchan |         10        0.00       40.44
+                                  Kurmi |      7,807        1.21       41.65
+                       Kurmi (Pasmanda) |          2        0.00       41.65
+                               Kurumans |         34        0.01       41.66
+                               Kushwaha |      1,470        0.23       41.88
+Kushwaha -- e.g., Koeri, Maurya, Kachhi |        954        0.15       42.03
+Kushwaha -- e.g., Koeri, Maurya, Kach.. |          6        0.00       42.03
+Kushwaha -- e.g., Koeri, Maurya, Kach.. |          1        0.00       42.03
+                               Lingayat |      6,620        1.03       43.06
+                                   Lodh |      1,744        0.27       43.33
+                         Lodh (Mazhabi) |          3        0.00       43.33
+                        Lodh (Pasmanda) |          6        0.00       43.33
+                                 Lohana |        352        0.05       43.38
+                                  Lohar |        743        0.12       43.50
+                       Lohar (Pasmanda) |         68        0.01       43.51
+                                  Lohra |         82        0.01       43.52
+                                 Madiga |      6,171        0.96       44.48
+                                  Mahar |     13,370        2.07       46.55
+                          Mahishya/Lodh |      1,180        0.18       46.73
+                Mahishya/Lodh (Mazhabi) |          1        0.00       46.73
+                             Mahisyadas |         48        0.01       46.74
+                      Mahyavansi/Vankar |      2,202        0.34       47.08
+                                   Mala |      4,542        0.70       47.79
+                           Malai Arayan |          4        0.00       47.79
+                               Malayali |         16        0.00       47.79
+                                   Mali |      5,080        0.79       48.58
+                         Mali (Mazhabi) |          4        0.00       48.58
+                                 Mallah |        608        0.09       48.67
+                                   Mang |      3,293        0.51       49.18
+                                Maratha |     20,101        3.11       52.29
+                          Maratha-Kunbi |        604        0.09       52.39
+                                 Marati |         90        0.01       52.40
+                               Maravars |        667        0.10       52.51
+                                 Maurya |        917        0.14       52.65
+                       Maurya (Mazhabi) |          1        0.00       52.65
+                      Maurya (Pasmanda) |          1        0.00       52.65
+                                Mazhabi |      2,417        0.37       53.02
+                                   Megh |      2,143        0.33       53.35
+                                Meghval |        510        0.08       53.43
+                                 Mehtar |        268        0.04       53.48
+                                  Mikir |         33        0.01       53.48
+                                   Mina |      1,861        0.29       53.77
+                                  Mochi |         32        0.00       53.77
+                               Mudaliar |      3,134        0.49       54.26
+                    Mudaliar (Pasmanda) |          2        0.00       54.26
+                          Mughal (Khan) |     10,953        1.70       55.96
+                                  Munda |        752        0.12       56.07
+                           Munnuru Kapu |      1,001        0.16       56.23
+                 Munnuru Kapu (Mazhabi) |          6        0.00       56.23
+                                Musahar |        345        0.05       56.28
+                             Mutharayar |      1,186        0.18       56.47
+                               Muthuvan |         60        0.01       56.48
+                                 Nadars |      1,316        0.20       56.68
+                      Nadars (Pasmanda) |          1        0.00       56.68
+                                  Naidu |      1,653        0.26       56.94
+                                 Naikda |      1,868        0.29       57.22
+                          Naikda/Nayaka |        327        0.05       57.28
+                                 Naiker |        965        0.15       57.43
+                      Naiker (Pasmanda) |          1        0.00       57.43
+                                   Nair |        905        0.14       57.57
+                              Namasudra |      3,138        0.49       58.05
+                                    Nat |          3        0.00       58.05
+                                 Nishad |      1,726        0.27       58.32
+                       Nishad (Mazhabi) |          9        0.00       58.32
+                      Nishad (Pasmanda) |          1        0.00       58.32
+                         Not Applicable |         18        0.00       58.32
+                                  Oraon |      1,035        0.16       58.48
+                              Other OBC |     50,338        7.80       66.28
+                    Other OBC (Mazhabi) |        125        0.02       66.30
+                   Other OBC (Pasmanda) |     16,956        2.63       68.93
+                               Other SC |     13,966        2.16       71.09
+                               Other ST |      6,547        1.01       72.11
+                     Other Upper Castes |      9,051        1.40       73.51
+                                 Pallan |      2,187        0.34       73.85
+                                    Pan |        618        0.10       73.94
+                                Paniyan |        109        0.02       73.96
+                                Pannadi |          4        0.00       73.96
+                               Paraiyan |      2,188        0.34       74.30
+                                   Pasi |      2,964        0.46       74.76
+                                  Patel |      1,165        0.18       74.94
+                          Patel/Patidar |      2,974        0.46       75.40
+                        Patels/Patidars |        124        0.02       75.42
+                                  Patni |        102        0.02       75.44
+                                 Pillai |      1,624        0.25       75.69
+                                    Pod |      1,954        0.30       75.99
+                              Prajapati |      1,630        0.25       76.24
+                   Prajapati (Pasmanda) |          3        0.00       76.24
+                                Pulayan |      1,538        0.24       76.48
+                                 Rabhar |         16        0.00       76.48
+                            Rai Bahadur |         12        0.00       76.49
+                                  Rajak |         11        0.00       76.49
+                              Rajbanshi |      3,208        0.50       76.99
+                                Rajbhar |         26        0.00       76.99
+                                Rajputs |     16,156        2.50       79.49
+                        Rajputs (Ghosh) |        380        0.06       79.55
+                        Rajputs/Darbars |      2,487        0.39       79.94
+                        Rajputs/Naicker |          4        0.00       79.94
+                                   Raju |        470        0.07       80.01
+                                 Rajwas |        130        0.02       80.03
+                                Rathawa |        750        0.12       80.15
+                                  Reddy |      3,368        0.52       80.67
+                               Sahariya |         33        0.01       80.67
+                                 Santal |      1,086        0.17       80.84
+                                Santhal |        920        0.14       80.98
+                                  Saora |        115        0.02       81.00
+                                  Savar |          2        0.00       81.00
+                                  Senai |         33        0.01       81.01
+                                  Senva |        153        0.02       81.03
+            Service OBC (Banjara, etc.) |        688        0.11       81.14
+  Service OBC (Banjara, etc.) (Mazhabi) |          2        0.00       81.14
+Service OBC (Dhobi, Nai, Penja, Baira.. |        391        0.06       81.20
+Service OBC (Dhobi, Nai, Penja, Baira.. |          5        0.00       81.20
+Service OBC (Dhobi, Nai, Penja, Baira.. |          2        0.00       81.20
+Service OBC (Ezhavas, Veluthedathu Na.. |      4,497        0.70       81.90
+Service OBC (Ezhavas, Veluthedathu Na.. |          4        0.00       81.90
+Service OBC (Ezhavas, Veluthedathu Na.. |         47        0.01       81.90
+Service OBC (Ghanchi/Vaghari/Dhobi/Na.. |      2,860        0.44       82.35
+Service OBC (Ghanchi/Vaghari/Dhobi/Na.. |         35        0.01       82.35
+Service OBC (Kewat, Dhobi, Nai/Napit,.. |        604        0.09       82.45
+Service OBC (Kewat, Dhobi, Nai/Napit,.. |         19        0.00       82.45
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |      9,237        1.43       83.88
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |         46        0.01       83.89
+Service OBC (Kewat/Dhobi/Nai/Teli/Jog.. |        122        0.02       83.91
+      Service OBC (Kewat/Nai/Teli/Jogi) |      3,002        0.47       84.37
+Service OBC (Kewat/Nai/Teli/Jogi) (Ma.. |          3        0.00       84.37
+Service OBC (Kewat/Nai/Teli/Jogi) (Pa.. |         59        0.01       84.38
+Service OBC (Meenavar, Dhobi, Nai, Pa.. |      1,469        0.23       84.61
+Service OBC (Meenavar, Dhobi, Nai, Pa.. |         10        0.00       84.61
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |      2,720        0.42       85.03
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |         10        0.00       85.03
+Service OBC (Nai/Napit/Dhobi(non-SC)/.. |        298        0.05       85.08
+Service OBC (Pallekari/Rajaka/Mangali.. |      2,783        0.43       85.51
+Service OBC (Pallekari/Rajaka/Mangali.. |         15        0.00       85.51
+Service OBC (Pallekari/Rajaka/Mangali.. |        186        0.03       85.54
+Service OBC (Teli, Nai/Napit/Dhobi(no.. |         24        0.00       85.55
+Service OBC (Teli, Nai/Napit/Dhobi(no.. |         30        0.00       85.55
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      1,808        0.28       85.83
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         16        0.00       85.83
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |          5        0.00       85.83
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      2,542        0.39       86.23
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         10        0.00       86.23
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         41        0.01       86.24
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |      1,923        0.30       86.53
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |          3        0.00       86.53
+Service OBC (Teli, Nai/Napit/Dhobi/Ke.. |         57        0.01       86.54
+Service OBC (Teli/ Nai/Napit/Dhobi/Ke.. |        126        0.02       86.56
+Service OBC (Yogi/Chutiya/Dugla/Britt.. |        351        0.05       86.62
+Service OBC (Yogi/Chutiya/Dugla/Britt.. |          3        0.00       86.62
+ Service OBCs (Besta/Agasa/Hajama/etc.) |        962        0.15       86.77
+Service OBCs (Besta/Agasa/Hajama/etc... |          5        0.00       86.77
+Service OBCs (Besta/Agasa/Hajama/etc... |          3        0.00       86.77
+                                 Shabar |        483        0.07       86.84
+                               Shilpkar |         60        0.01       86.85
+                                  Sonar |        993        0.15       87.01
+                             Sourashtra |        374        0.06       87.06
+                                 Sugali |        179        0.03       87.09
+                                 Tamoli |        178        0.03       87.12
+                                   Teli |      1,501        0.23       87.35
+                        Teli (Pasmanda) |        275        0.04       87.39
+                                 Thakur |        541        0.08       87.48
+                                Thandan |         70        0.01       87.49
+                                  Tharu |          2        0.00       87.49
+                                 Thevar |      1,032        0.16       87.65
+                                Thigala |        365        0.06       87.70
+          Thondai Mandala Saiva Vellala |          6        0.00       87.71
+                                  Thori |         88        0.01       87.72
+                                  Thoti |          7        0.00       87.72
+                            Thurpu Kapu |        468        0.07       87.79
+                                Tripura |         15        0.00       87.80
+                                   Turi |        311        0.05       87.84
+                               Vadrangi |        313        0.05       87.89
+                    Vadrangi (Pasmanda) |          4        0.00       87.89
+                                Vadugar |        153        0.02       87.92
+                   Vaishya (Saha)/Bania |      1,098        0.17       88.09
+                    Vaishya-Vanis/Bania |         55        0.01       88.10
+                          Vaishya/Bania |     10,308        1.60       89.69
+                  Vaishya/Marwari/Bania |      2,933        0.45       90.15
+                  Vaisya, Komati, Bania |      1,748        0.27       90.42
+                                 Vannam |         44        0.01       90.42
+                               Vanniyar |      7,504        1.16       91.59
+                                  Varli |        345        0.05       91.64
+                                  Varma |         13        0.00       91.64
+                                 Velama |        420        0.07       91.71
+                               Vettuvan |          5        0.00       91.71
+                              Vokkaliga |      3,789        0.59       92.30
+                   Vokkaliga (Pasmanda) |          4        0.00       92.30
+                             Vokkalinga |         13        0.00       92.30
+                    Vyasa/Vaishya/Bania |        469        0.07       92.37
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |      4,280        0.66       93.03
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |         28        0.00       93.04
+Weaver and Craftsmen OBC (Bhavsar/Dar.. |         75        0.01       93.05
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      2,289        0.35       93.40
+Weaver and Craftsmen OBC (Bunkar/Darz.. |          4        0.00       93.40
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         50        0.01       93.41
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      1,156        0.18       93.59
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         12        0.00       93.59
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         55        0.01       93.60
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      2,855        0.44       94.04
+Weaver and Craftsmen OBC (Bunkar/Darz.. |         19        0.00       94.05
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        335        0.05       94.10
+Weaver and Craftsmen OBC (Bunkar/Darz.. |        278        0.04       94.14
+Weaver and Craftsmen OBC (Bunkar/Darz.. |          7        0.00       94.14
+Weaver and Craftsmen OBC (Bunkar/Darz.. |      1,725        0.27       94.41
+Weaver and Craftsmen OBC (Devanga/Dar.. |      3,592        0.56       94.97
+Weaver and Craftsmen OBC (Devanga/Dar.. |         11        0.00       94.97
+Weaver and Craftsmen OBC (Devanga/Dar.. |         29        0.00       94.97
+Weaver and Craftsmen OBC (Devanga/Kum.. |      2,138        0.33       95.30
+Weaver and Craftsmen OBC (Devanga/Kum.. |          9        0.00       95.31
+Weaver and Craftsmen OBC (Devanga/Kum.. |          3        0.00       95.31
+Weaver and Craftsmen OBC (Khati/Bunka.. |      1,587        0.25       95.55
+Weaver and Craftsmen OBC (Khati/Bunka.. |         27        0.00       95.56
+Weaver and Craftsmen OBC (Khati/Bunka.. |        132        0.02       95.58
+Weaver and Craftsmen OBC (Kumar/Namas.. |          3        0.00       95.58
+Weaver and Craftsmen OBC (Tanti/Malak.. |         25        0.00       95.58
+Weaver and Craftsmen OBC (Tanti/Malak.. |          1        0.00       95.58
+Weavers and Craftsmen OBC  (Gaderia, .. |      2,706        0.42       96.00
+Weavers and Craftsmen OBC (Devangas, .. |        965        0.15       96.15
+Weavers and Craftsmen OBC (Devangas, .. |          1        0.00       96.15
+Weavers and Craftsmen OBC (Devangas, .. |         11        0.00       96.15
+Weavers and Craftsmen OBC (Koshti, Pa.. |      1,749        0.27       96.42
+Weavers and Craftsmen OBC (Koshti, Pa.. |          3        0.00       96.42
+Weavers and Craftsmen OBC (Koshti, Pa.. |          8        0.00       96.42
+Weavers and Craftsmen OBC (Tanti, Bun.. |      1,078        0.17       96.59
+Weavers and Craftsmen OBC (Viswakarma.. |        446        0.07       96.66
+Weavers and Craftsmen OBC (Viswakarma.. |          1        0.00       96.66
+                                  Yadav |     14,915        2.31       98.97
+                        Yadav (Mazhabi) |          3        0.00       98.97
+                       Yadav (Pasmanda) |          3        0.00       98.97
+           Yadav/Ahir/Sadgop/Goala/Gope |        615        0.10       99.07
+ Yadav/Ahir/Sadgop/Goala/Gope (Mazhabi) |          1        0.00       99.07
+                    Yadava/Golla/Kuruma |      3,127        0.48       99.55
+         Yadava/Golla/Kuruma (Pasmanda) |         32        0.00       99.56
+                                 Yadavs |        755        0.12       99.67
+                       Yadavs (Mazhabi) |          8        0.00       99.68
+                      Yadavs (Pasmanda) |          1        0.00       99.68
+                                Yadhava |      1,455        0.23       99.90
+                                 Yenadi |        333        0.05       99.95
+                               Yerukula |        304        0.05      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+    CASTE_CATEGORY |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+Intermediate Caste |     64,269        9.96        9.96
+    Not Applicable |          5        0.00        9.96
+        Not Stated |      9,407        1.46       11.42
+               OBC |    248,489       38.50       49.91
+                SC |    141,907       21.99       71.90
+                ST |     37,869        5.87       77.77
+       Upper Caste |    143,498       22.23      100.00
+-------------------+-----------------------------------
+             Total |    645,444      100.00
+
+          LITERACY |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+                 N |     50,103        7.76        7.76
+                 Y |    595,341       92.24      100.00
+-------------------+-----------------------------------
+             Total |    645,444      100.00
+
+                   EDUCATION |      Freq.     Percent        Cum.
+-----------------------------+-----------------------------------
+              10th Std. Pass |    104,030       16.12       16.12
+              11th Std. Pass |     17,282        2.68       18.80
+              12th Std. Pass |     72,571       11.24       30.04
+               1st Std. Pass |     12,592        1.95       31.99
+               2nd Std. Pass |     11,496        1.78       33.77
+               3rd Std. Pass |     13,711        2.12       35.89
+               4th Std. Pass |     19,966        3.09       38.99
+               5th Std. Pass |     94,170       14.59       53.58
+               6th Std. Pass |     16,576        2.57       56.15
+               7th Std. Pass |     25,173        3.90       60.05
+               8th Std. Pass |     41,870        6.49       66.53
+               9th Std. Pass |     33,600        5.21       71.74
+Diploma / certificate course |      8,059        1.25       72.99
+                    Graduate |     85,604       13.26       86.25
+                No Education |     56,418        8.74       94.99
+               Ph.D / M.Phil |        269        0.04       95.03
+               Post Graduate |     32,057        4.97      100.00
+-----------------------------+-----------------------------------
+                       Total |    645,444      100.00
+
+                             DISCIPLINE |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                            Agriculture |         17        0.00        0.00
+                           Architecture |        187        0.03        0.03
+                                   Arts |    125,268       19.41       19.44
+Ayurvedic Medicine/Yunani Medicine/Na.. |        110        0.02       19.46
+                               Commerce |     35,197        5.45       24.91
+Completed - Professional Courses (CA/.. |         15        0.00       24.91
+                   Computer Application |        763        0.12       25.03
+                                Dentist |         89        0.01       25.04
+                              Education |      1,061        0.16       25.21
+                            Engineering |      9,371        1.45       26.66
+        Fashion/Interior/Apparel Design |         42        0.01       26.67
+                              Fine Arts |        137        0.02       26.69
+                             Homeopathy |         88        0.01       26.70
+                       Hotel Management |        167        0.03       26.73
+Intermediate - Professional Courses (.. |          4        0.00       26.73
+                                    Law |      1,745        0.27       27.00
+          Management Studies in Finance |        250        0.04       27.04
+Management Studies in Human Resource .. |         89        0.01       27.05
+        Management Studies in Marketing |        125        0.02       27.07
+        Management Studies in Operation |         14        0.00       27.07
+           Management Studies in Others |        291        0.05       27.12
+              Mass Media/ Communication |         70        0.01       27.13
+                               Medicine |        649        0.10       27.23
+                         Not Applicable |    429,871       66.60       93.83
+                               Pharmacy |        313        0.05       93.88
+                          Physiotherapy |         41        0.01       93.88
+        Professional Courses(CA/CS/CFA) |        203        0.03       93.92
+                                Science |     39,224        6.08       99.99
+                     Veterinary Science |         43        0.01      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+                   NATURE_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+                  Agricultural Labourer |     34,003        5.27        5.27
+                            Businessman |     36,232        5.61       10.88
+                             Home Maker |     76,509       11.85       22.74
+                      Home-based Worker |      5,769        0.89       23.63
+                     Industrial Workers |     22,358        3.46       27.09
+    Legislator/Social Worker/ Activists |        375        0.06       27.15
+                                Manager |      1,562        0.24       27.39
+      Non-Industrial Technical Employee |     15,349        2.38       29.77
+                       Organised Farmer |     20,291        3.14       32.92
+  Qualified Self Employed Professionals |      2,421        0.38       33.29
+                           Retired/Aged |     28,667        4.44       37.73
+             Self Employed Entrepreneur |     69,567       10.78       48.51
+                           Small Farmer |     49,965        7.74       56.25
+Small Trader/Hawker/ Businessman with.. |     20,432        3.17       59.42
+                                Student |     32,741        5.07       64.49
+                          Support Staff |     52,848        8.19       72.68
+                             Unoccupied |      6,867        1.06       73.74
+                          Wage Labourer |    115,316       17.87       91.61
+        White Collar Clerical Employees |     28,078        4.35       95.96
+White-Collar Professional Employees a.. |     26,094        4.04      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+                 INDUSTRY_OF_OCCUPATION |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+         Agriculture- allied activities |        800        0.12        0.12
+Automobiles and Other Transport Equip.. |      4,225        0.65        0.78
+Cement, Tiles, Bricks, Ceramics, Glas.. |      9,202        1.43        2.20
+                    Chemical Industries |      4,314        0.67        2.87
+          Communication, Post & Courier |      2,759        0.43        3.30
+                       Crop Cultivation |     93,814       14.53       17.83
+                       Defence Services |      1,867        0.29       18.12
+                              Education |     23,015        3.57       21.69
+               Entertainment and Sports |        737        0.11       21.80
+                     Financial Services |     10,392        1.61       23.41
+                                Fishing |      1,122        0.17       23.59
+                        Food Industries |      6,867        1.06       24.65
+  Footwear and other Leather Industries |      2,714        0.42       25.07
+        Forestry including Wood Cutting |        223        0.03       25.11
+           Fruits and Vegetable Farming |      6,772        1.05       26.16
+                       Gems & Jewellery |      2,653        0.41       26.57
+                  Handicraft Industries |      1,433        0.22       26.79
+                            Health Care |      6,345        0.98       27.77
+                 Hotels and Restaurants |      7,087        1.10       28.87
+                              IT & ITES |      4,651        0.72       29.59
+                Machinery Manufacturers |      5,103        0.79       30.38
+                   Media and Publishing |      1,371        0.21       30.59
+                       Metal Industries |     10,679        1.65       32.25
+                                  Mines |      2,422        0.38       32.62
+                         Not Applicable |    144,784       22.43       55.06
+     Personal Non-Professional Services |     39,583        6.13       61.19
+         Personal Professional Services |      2,236        0.35       61.53
+            Pharmaceutical Manufacturer |      1,794        0.28       61.81
+Poultry Farming, Animal Husbandry and.. |      1,913        0.30       62.11
+         Public Administrative Services |     18,282        2.83       64.94
+             Real Estate & Construction |     80,303       12.44       77.38
+                           Retail Trade |     87,931       13.62       91.01
+Soaps, Detergents, Cosmetics, Toiletr.. |      1,038        0.16       91.17
+                     Textile Industries |     16,731        2.59       93.76
+                     Travel and Tourism |     31,806        4.93       98.69
+                              Utilities |      3,313        0.51       99.20
+                        Wholesale Trade |      5,163        0.80      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    645,444      100.00
+
+EMPLOYMENT_ |
+STATUS_SINC |
+      E_YRS |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       -100 |     10,070        1.56        1.56
+          0 |        563        0.09        1.65
+          1 |     21,118        3.27        4.92
+          2 |     33,627        5.21       10.13
+          3 |     22,431        3.48       13.60
+          4 |     17,864        2.77       16.37
+          5 |     34,736        5.38       21.75
+          6 |     16,187        2.51       24.26
+          7 |     11,936        1.85       26.11
+          8 |     22,075        3.42       29.53
+          9 |      6,372        0.99       30.52
+         10 |     38,912        6.03       36.55
+         11 |      4,464        0.69       37.24
+         12 |     21,913        3.40       40.63
+         13 |      7,275        1.13       41.76
+         14 |      7,963        1.23       42.99
+         15 |     37,815        5.86       48.85
+         16 |     10,494        1.63       50.48
+         17 |      8,829        1.37       51.85
+         18 |     19,714        3.05       54.90
+         19 |      6,017        0.93       55.83
+         20 |     50,349        7.80       63.63
+         21 |      6,153        0.95       64.59
+         22 |     18,894        2.93       67.51
+         23 |      9,482        1.47       68.98
+         24 |      9,531        1.48       70.46
+         25 |     39,125        6.06       76.52
+         26 |      8,763        1.36       77.88
+         27 |      7,331        1.14       79.02
+         28 |     11,596        1.80       80.81
+         29 |      3,329        0.52       81.33
+         30 |     31,466        4.88       86.20
+         31 |      2,269        0.35       86.55
+         32 |      8,853        1.37       87.93
+         33 |      3,415        0.53       88.46
+         34 |      3,637        0.56       89.02
+         35 |     15,882        2.46       91.48
+         36 |      3,663        0.57       92.05
+         37 |      2,975        0.46       92.51
+         38 |      5,445        0.84       93.35
+         39 |      1,482        0.23       93.58
+         40 |     11,882        1.84       95.42
+         41 |        982        0.15       95.57
+         42 |      3,509        0.54       96.12
+         43 |      1,444        0.22       96.34
+         44 |      1,261        0.20       96.54
+         45 |      5,037        0.78       97.32
+         46 |      1,144        0.18       97.49
+         47 |      1,143        0.18       97.67
+         48 |      1,746        0.27       97.94
+         49 |        472        0.07       98.02
+         50 |      3,331        0.52       98.53
+         51 |        319        0.05       98.58
+         52 |      1,238        0.19       98.77
+         53 |        599        0.09       98.87
+         54 |        630        0.10       98.96
+         55 |      1,680        0.26       99.22
+         56 |        652        0.10       99.32
+         57 |        521        0.08       99.41
+         58 |        909        0.14       99.55
+         59 |        267        0.04       99.59
+         60 |      2,652        0.41      100.00
+         61 |         11        0.00      100.00
+------------+-----------------------------------
+      Total |    645,444      100.00
+
+TYPE_OF_EMPLOYMENT |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+         Full-time |    494,398       76.60       76.60
+    Not Applicable |    146,108       22.64       99.24
+         Part-time |      4,936        0.76      100.00
+-------------------+-----------------------------------
+             Total |    645,442      100.00
+
+          EMPLOYMENT_ARRANGEMENT |      Freq.     Percent        Cum.
+---------------------------------+-----------------------------------
+Daily Wage worker/ Casual labour |    133,769       20.73       20.73
+                  Not Applicable |    146,108       22.64       43.36
+            Salaried - Permanent |     85,488       13.24       56.61
+            Salaried - Temporary |     63,245        9.80       66.41
+                   Self-employed |    216,832       33.59      100.00
+---------------------------------+-----------------------------------
+                           Total |    645,442      100.00
+
+TIME_TO_START_WORK |
+               ING |      Freq.     Percent        Cum.
+-------------------+-----------------------------------
+         12 months |        971        0.15        0.15
+         18 months |        640        0.10        0.25
+ 24 months or more |      9,338        1.45        1.70
+          3 months |        380        0.06        1.76
+          6 months |        380        0.06        1.81
+          9 months |        213        0.03        1.85
+        Don't Know |     42,692        6.61        8.46
+             Never |     77,813       12.06       20.52
+    Not Applicable |    513,015       79.48      100.00
+-------------------+-----------------------------------
+             Total |    645,442      100.00
+
+. 
+. * I add more var (additional to Carlos' original variable selection) to help 
+> the merge
+. keep date_m nature month id hh_id mem_id industry state hr district region_ty
+> pe mem_weight_ms relation_with_hoh income_of_member_from_all_source income_of
+> _member_from_wages
+
+. 
+. * merge back the weight!!!!
+. temp_carlos_m_expense_1618
+command temp_carlos_m_expense_1618 is unrecognized
+r(199);
+
+end of do-file
+r(199);

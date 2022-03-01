@@ -75,7 +75,7 @@ replace month_slot="Nov "+substr(month_slot,1,4) if substr(month_slot,-3,.)=="m1
 replace month_slot="Dec "+substr(month_slot,1,4) if substr(month_slot,-3,.)=="m12"
 
 
-* recode date of the survey (I change this later to Carlos's labeling)
+* recode date of the survey (I replace this later to Carlos's labeling)
 /*
 gen date=date(month_slot, "MY")
 format date %d
@@ -123,7 +123,7 @@ order hh_id year month period month_slot month_CMIE district region_type stratum
 
 */
 
-
+* Some useful date indicators
 gen date=date(month, "MY")
 format date %d
 gen month_var = month(date)  // data month
@@ -139,7 +139,7 @@ drop if year>2019
 drop if year<2014
 
 
-* save temporary file for Feb 16 meeting
+* save temporary file for Feb 16/23 meeting
 drop state hr district stratum psu_id response_status reason_for_non_response
 save temp_carlos_m_expense_1618,replace
 
@@ -246,18 +246,7 @@ graph export total_exp_by_industry.pdf, replace
 
 
 
-
-
-
-
-
-
 * add confidence interval later!!
-
-
-
-
-
 
 
 
@@ -281,6 +270,13 @@ graph export total_exp_by_industry.pdf, replace
 
 
 * By group plotting intoxicant expenditure patterns overtime
+
+
+
+
+* need to incorporate Feb 16 meeting's suggestions!
+
+
 
 
 

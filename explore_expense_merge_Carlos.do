@@ -1,114 +1,113 @@
-**** Expense merged with Carlos' datasets
+**** Expense merged with Carlos' datasets, but only to household's head
+
 clear
 set more off
 set seed 123456
 
-cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
-use carlos_employment_income_1618,replace
+* This script bases on Carlos Feb 15 latest script on event study. I didn't change anything before his Feb 15 version and just merge in household variables for analysis 
 
-* This script bases on Carlos Feb 15 latest script on event study. I didn't change anything but just merge in household variables for analysis 
+* There is another script called explore_expense_merge_carlos_hhmerge.do  . This script merges monthly household expenditure with household heads' master dataset. The other script first transform Carlos' datasets to household levels with summary variables on household income and emeployement status and then merge directly with the monthly income data. 
+
+cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
+use carlos_employment_income_1618_10p,replace
+/*
+sample 10 
+save carlos_employment_income_1618_10p, replace
+sample 10 
+save carlos_employment_income_1618_1p, replace
+
+
+use temp_carlos_m_expense_1618,replace
+sample 10 
+save temp_carlos_m_expense_1618_10p, replace
+sample 10 
+save temp_carlos_m_expense_1618_1p, replace
+*/
+
+
+* Feb23 note: Note that temp_carlos_m_expense_1618 include more years.
+
+* CAVEAT:think about weights when collapsing the dataset.
+
 
 /*
-*** do a description of income by nature of occupation (do self-employed loose income?)
-preserve
-collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income_of_member_from_wages mean_pension=income_of_member_from_pension mean_dividend=income_of_member_from_dividend mean_interest=income_of_member_from_interest mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income=income_of_member_from_all_source median_wage=income_of_member_from_wages median_pension=income_of_member_from_pension median_dividend=income_of_member_from_dividend median_interest=income_of_member_from_interest median_fd_pf_insurance=income_of_member_from_fd_pf_insu, by(date_m nature)
-egen id=group(nature)
-xtset id date_m
-*** graphs with pairwise comparison of both mean and median income across self-employed people and other groups
-* july first implementation of gst
+How many are hoh (full Carlos sample)? Recall that in early days some obs are truncated out.
 
-*mean pair-wise comparison
-levelsof nature, local(class)
-foreach group of local class {
-if "`group'"~="Self Employed Entrepreneur" {
-if length("`group'")>36 {
-	local rows 2	
-}
-if length("`group'")<37 {
-	local rows 1
-}
-local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.)'"," ","",.)'"	
-twoway tsline mean_income if nature=="Self Employed Entrepreneur" || tsline mean_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") rows(`rows')) 
+ tab relation_with_hoh
 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_pair_wise_`name'.pdf, replace
-}	
-}
+    RELATION_WITH_HOH |      Freq.     Percent        Cum.
+----------------------+-----------------------------------
+              Brother |     50,963        0.79        0.79
+Brother/Sister-in-law |      5,168        0.08        0.87
+       Daugher-in-law |          4        0.00        0.87
+             Daughter |    175,745        2.72        3.59
+      Daughter-in-law |    138,141        2.14        5.73
+        Domestic help |        382        0.01        5.74
+               Friend |         64        0.00        5.74
+           Grandchild |     46,827        0.73        6.47
+                  HOH |  3,312,516       51.32       57.79
+                Inlaw |      1,363        0.02       57.81
+  Other non-relatives |        156        0.00       57.81
+               Parent |     43,710        0.68       58.49
+             Relative |      8,929        0.14       58.63
+               Sister |     11,133        0.17       58.80
+                  Son |  1,949,801       30.21       89.01
+           Son-in-law |     12,010        0.19       89.19
+               Spouse |    697,529       10.81      100.00
+----------------------+-----------------------------------
+                Total |  6,454,441      100.00
 
-*median pair-wise comparison
-levelsof nature, local(class)
-foreach group of local class {
-if "`group'"~="Self Employed Entrepreneur" {
-if length("`group'")>36 {
-	local rows 2	
-}
-if length("`group'")<37 {
-	local rows 1
-}
-local name "`=subinstr("`=subinstr("`=subinstr("`group'","-","",.)'","/","",.)'"," ","",.)'"	
-twoway tsline median_income if nature=="Self Employed Entrepreneur" || tsline median_income if nature=="`group'", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "`group'") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_pair_wise_`name'.pdf, replace
-}	
-}
-restore 
+This is the relationship of the member with the head of the household. One member of the household is classified by the interviewer, as the head of the household. This is usually the one who takes the most important decisions in the household. In many modern households such a classification of one individual as the head of the household is facile (flexible). Nevertheless, *one person* of every household is classified as the head of the household. This is useful as it creates a reference for relationships within the household. All relationships are with respect to the head of the household.		
 
-preserve
-gen self_employed=nature=="Self Employed Entrepreneur"
-collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income_of_member_from_wages mean_pension=income_of_member_from_pension mean_dividend=income_of_member_from_dividend mean_interest=income_of_member_from_interest mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income=income_of_member_from_all_source median_wage=income_of_member_from_wages median_pension=income_of_member_from_pension median_dividend=income_of_member_from_dividend median_interest=income_of_member_from_interest median_fd_pf_insurance=income_of_member_from_fd_pf_insu, by(date_m self_employed)
-
-xtset self_employed date_m
-
-*** graphs with comparison of both mean and median income across self-employed people and other groups
-
-*mean self employed vs the rest comparison
-	
-twoway tsline mean_income if self_employed==1 || tsline mean_income if self_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_vstherest.pdf, replace
-
-
-*median self employed vs the rest comparison 
-
-twoway tsline median_income if self_employed==1 || tsline median_income if self_employed==0, tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Median Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_vstherest.pdf, replace
-
-restore 
-
-**** by industry
-
-preserve
-gen self_employed=nature_o=="Self Employed Entrepreneur"
-bys hh_id mem_id: egen aux=max(self_employed)
-keep if aux
-collapse (mean) mean_income=income_of_member_from_all_source mean_wage=income_of_member_from_wages mean_pension=income_of_member_from_pension mean_dividend=income_of_member_from_dividend mean_interest=income_of_member_from_interest mean_fd_pf_insurance=income_of_member_from_fd_pf_insu (median) median_income=income_of_member_from_all_source median_wage=income_of_member_from_wages median_pension=income_of_member_from_pension median_dividend=income_of_member_from_dividend median_interest=income_of_member_from_interest median_fd_pf_insurance=income_of_member_from_fd_pf_insu, by(date_m industry self_employed)
-
-encode industry, generate(industry)
-
-egen id=group(industry self_employed)
-xtset id date_m
-
-*** graphs with comparison of both mean and median income across self-employed people and other groups
-
-*mean self employed vs the rest comparison
-
-twoway tsline mean_income if self_employed==1& industry_=="Machinery Manufacturers" || tsline mean_income if self_employed==0& industry_=="Machinery Manufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\mean_machinery_manufacturers_vstherest.pdf, replace
-
-*median self employed vs the rest comparison 
-
-twoway tsline median_income if self_employed==1& industry_=="Machinery Manufacturers" || tsline median_income if self_employed==0& industry_=="Machinery Manufacturers", tline(2017m7, lc(red) lp(dash)) yscale(titlegap(*5)) ytitle("Average Income from any Source",) xtitle(Date) xla(#20, labsize(medsmall) format(%tmMon)) xmla(#5, format(%tmCY) labsize(medsmall) tlength(*7) tlcolor(none)) legend(label(1 "Self Employed") label(2 "Others") rows(`rows')) 
-graph export Graphs\Pyramids_Comparison_Self_Employed_Others\median_machinery_manufacturers_vstherest.pdf, replace
-restore 
-
-/* I don't see a lot of evidence with just this grahs to say that there is a reduction on income of self-employees in general or compared to most groups
- we should probably look inside the industry of occupation, also porbably we can do a regression of income on education, gender, age, health, controlls,and industry-year fixed effects and then do these graphs on the residuals*/
+Definition of hoh
 */
-*** do a survival analysis of employment arrangement (do self-employed switch out of self-employment more?)
 
+sort hh_id mem_id month_slot month
+order hh_id mem_id month_slot month
 
+* check the stats of the head of the household
+
+* confirmed: only one person is HOH per HH.
+duplicates report hh_id mem_id month_slot month
+duplicates report hh_id month_slot month if relation_with_hoh=="HOH"
+
+* there are households not having hoh
+gen temp1 = 1 if relation_with_hoh=="HOH"
+replace temp1 = 0 if relation_with_hoh~="HOH"
+bysort hh_id: egen temp2=sum(temp1)  // no hoh in any point in time
+codebook hh_id if temp2==0
+codebook hh_id if temp2~=0
+
+* what is the image of these hoh?
+foreach char in gender religion caste caste_category literacy education discipline nature_of_occupation industry_of_occupation employment_status_since_yrs type_of_employment employment_arrangement time_to_start_working{
+	tab `char' 
+	tab `char' if relation_with_hoh=="HOH"
+	/* one can roughly see the following pattern compared to the overall population, the average HOH are more likely to be:male, to be tagged "not applicable" in discipline, to be , non-home-maker, full time.
+	
+	There is no difference in observation proportion in religion,caste group, education, employment arrangement.
+	
+	uncheck: caste , industry, employment_status_since_yrs, time to start working
+	*/
+}
+foreach char in gender religion caste caste_category literacy education discipline nature_of_occupation industry_of_occupation employment_status_since_yrs type_of_employment employment_arrangement time_to_start_working{
+	tab `char' 
+	/*
+	
+	
+	*/
+}
+
+* I add more var (additional to Carlos' original variable selection) to help the merge
+keep date_m nature month id hh_id mem_id industry state hr district region_type mem_weight_ms relation_with_hoh income_of_member_from_all_source income_of_member_from_wages
 
 * merge back the weight!!!!
+temp_carlos_m_expense_1618
 
-* I add more var to help the merge
-keep date_m nature month id hh_id mem_id industry state hr district region_type mem_weight_ms relation_with_hoh income_of_member_from_all_source income_of_member_from_wages
+
+
+
+
+
 
 gen post=date_m>tm(2017m6)
 forvalues k=0(1)6 {
