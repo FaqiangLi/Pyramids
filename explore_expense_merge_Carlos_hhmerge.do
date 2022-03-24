@@ -15,7 +15,7 @@ capture cd "/Users/faqiangmacpro/Downloads/local_pyramids_tempfile"
 
 capture cd "/storage/home/fxl146/scratch/Pyramids_statafiles"
 
-/*
+
 use carlos_employment_income_1618,replace
 
 /*
@@ -49,7 +49,6 @@ rename (income_of_all_members_from_all_s income_of_all_members_from_wages income
 rename (income_of_household_from_all_sou income_of_household_from_rent income_of_household_from_self_pr income_of_household_from_private income_of_household_from_governm income_of_household_from_busines income_of_household_from_sale_of income_of_household_from_gamblin income_of_all_members_from_fd_pf) (incHH_hh_alls  incHH_hh_rent incHH_hh_selfprod incHH_hh_privtrans incHH_hh_govtrans incHH_hh_business incHH_hh_saleasset incHH_hh_gamble incHH_hh_fdpf)
 
 
-
 ************************************************************************
 * Fundamental variables construction
 ************************************************************************
@@ -77,29 +76,29 @@ drop aux
 
 ta nature, gen(nature_)
 
-rename nature_1 nature_agricultural
-rename nature_2 nature_business
-rename nature_3 nature_homemaker
-rename nature_4 nature_homeworker
-rename nature_5 nature_industrialw
-rename nature_6 nature_legislatoretc
-rename nature_7 nature_manager
-rename nature_8 nature_nonindtechemp
-rename nature_9 nature_orgfarmer
-rename nature_10 nature_qualified
-rename nature_11 nature_retired
-rename nature_12 nature_self
-rename nature_13 nature_smallfarmer
-rename nature_14 nature_small
-rename nature_15 nature_student
-rename nature_16 nature_suppstaff
-rename nature_17 nature_unoccupied
-rename nature_18 nature_wage
-rename nature_19 nature_whitec // changed from whiteclerical to whitec
-rename nature_20 nature_whitep // changed from whiteprofessional to white p
-rename nature_of_occupation nature 
+capture rename  nature_1 nature_agricultural
+capture rename  nature_2 nature_business
+capture rename  nature_3 nature_homemaker
+capture rename  nature_4 nature_homeworker
+capture rename  nature_5 nature_industrialw
+capture rename  nature_6 nature_legislatoretc
+capture rename  nature_7 nature_manager
+capture rename  nature_8 nature_nonindtechemp
+capture rename  nature_9 nature_orgfarmer
+capture rename  nature_10 nature_qualified
+capture rename  nature_11 nature_retired
+capture rename  nature_12 nature_self
+capture rename  nature_13 nature_smallfarmer
+capture rename  nature_14 nature_small
+capture rename  nature_15 nature_student
+capture rename  nature_16 nature_suppstaff
+capture rename  nature_17 nature_unoccupied
+capture rename  nature_18 nature_wage
+capture rename  nature_19 nature_whitec // changed from whiteclerical to whitec
+capture rename  nature_20 nature_whitep // changed from whiteprofessional to white p
+capture rename  nature_of_occupation nature 
 
-gen nature_all=nature_business==1|nature_industrialw==1|nature_qualified==1|nature_self==1|nature_small==1
+capture gen nature_all=nature_business==1|nature_industrialw==1|nature_qualified==1|nature_self==1|nature_small==1
 
 sort hh_id mem_id date_m
 bysort hh_id mem_id (date_m): gen period = _n
@@ -111,8 +110,15 @@ gen all_period_postGST = all_period-all_period_preGST
 
 // br hh_id mem_id period all_period all_period_preGST all_period_postGST post
 
+
+
+* Todo: Define additionally migration status according to member_status
+
+
+
+
 ************************************************************************
-* Household variables construction: income income
+* Household variables construction: income composition(or income structure)
 ************************************************************************
 
 * Generate income share within a households, by member
@@ -240,7 +246,7 @@ local xxx "`=substr("`xx'",8,.)'"  // read the variable's nature
 	replace hh_me_`xxx'=0 if hh_me_`xxx'==.
 }
 
-/*
+/* Todo
 1. household share of income of specific industry
 2. main earner's industry tag in the last period 
 
@@ -250,18 +256,6 @@ These variables are household level and will be used as the core event study ter
 */
 
 
-
-
-
-**********************************************************
-**************
-* Household variables construction: non income
-************************************************************************
-
-
-* note: there are some household level variables already availabe in monthly expense data!
-
-* can add more in the future: e.g. other household level treatment status, not usinig income, but just using occupation nature.
 
 ************************************************************************
 * Proceed to merging
@@ -278,14 +272,14 @@ These variables are household level and will be used as the core event study ter
 drop id mem_id 
 duplicates drop hh_id date_m, force
 
-* merge
+* merge wirh expenditure
 merge 1:1 hh_id month_slot month using temp_carlos_m_expense_1618
 keep if _merge==3
 drop _merge
 
 
 save temp_temp_temp, replace
-*/
+
 
 use temp_temp_temp, replace
 
@@ -303,32 +297,32 @@ replace hhsize=11 if size_group=="11-15 Members"
 replace hhsize=15 if size_group=="> 15 Members"
 tab hhsize
 
+
 * decode occupation group
 ta occupation_group, gen(hhnature_)
-rename hhnature_1 hhnature_agricultural
-rename hhnature_2 hhnature_business
-rename hhnature_3 hhnature_homemaker
-rename hhnature_4 hhnature_homeworker
-rename hhnature_5 hhnature_industrialw
-rename hhnature_6 hhnature_legislatoretc
-rename hhnature_7 hhnature_manager
-rename hhnature_8 hhnature_nonindtechemp
-rename hhnature_9 hhnature_orgfarmer
-rename hhnature_10 hhnature_qualified
-rename hhnature_11 hhnature_retired
-rename hhnature_12 hhnature_self
-rename hhnature_13 hhnature_smallfarmer
-rename hhnature_14 hhnature_small
-rename hhnature_15 hhnature_student
-rename hhnature_16 hhnature_suppstaff
-rename hhnature_17 hhnature_unoccupied
-rename hhnature_18 hhnature_wage
-rename hhnature_19 hhnature_whitec // changed from whiteclerical to whitec
-capture rename hhnature_20 hhnature_whitep // changed from whiteprofessional to white p
+capture rename  hhnature_1 hhnature_agricultural
+capture rename  hhnature_2 hhnature_business
+capture rename  hhnature_3 hhnature_homemaker
+capture rename  hhnature_4 hhnature_homeworker
+capture rename  hhnature_5 hhnature_industrialw
+capture rename  hhnature_6 hhnature_legislatoretc
+capture rename  hhnature_7 hhnature_manager
+capture rename  hhnature_8 hhnature_nonindtechemp
+capture rename  hhnature_9 hhnature_orgfarmer
+capture rename  hhnature_10 hhnature_qualified
+capture rename  hhnature_11 hhnature_retired
+capture rename  hhnature_12 hhnature_self
+capture rename  hhnature_13 hhnature_smallfarmer
+capture rename  hhnature_14 hhnature_small
+capture rename  hhnature_15 hhnature_student
+capture rename  hhnature_16 hhnature_suppstaff
+capture rename  hhnature_17 hhnature_unoccupied
+capture rename  hhnature_18 hhnature_wage
+capture rename  hhnature_19 hhnature_whitec // changed from whiteclerical to whitec
+capture rename  hhnature_20 hhnature_whitep // changed from whiteprofessional to white p
 rename occupation_group hhnature 
-gen hhnature_all=hhnature_business==1|hhnature_industrialw==1|hhnature_qualified==1|hhnature_self==1|hhnature_small==1
 
-* TODO: IN THE FUTURE, NEED TO INCORPORATE more hh chars, e.g. FAM SIZE (not just work force size, which is what we are doing )
+capture gen hhnature_all=hhnature_business==1|hhnature_industrialw==1|hhnature_qualified==1|hhnature_self==1|hhnature_small==1
 
 
 * Todo: wait for Carlos to add more years
@@ -378,7 +372,6 @@ sum exp_elasticity, detail
  sum exp_elasticity if date_m==tm(2017m9) , detail
 
 
-
 * saving rate and expeindture rate cutoff-type
 gen hhsave = hhinc_all_source - total_expenditure
 gen hhsaver = hhsave/hhinc_all_source
@@ -398,6 +391,77 @@ sum hhexppc if date_m==tm(2017m1), detail
  sum hhexppc if date_m==tm(2017m9), detail
 
 
+* Define some directly usable household level income variables
+rename total_incHH total_incHH_gross
+gen hhsave_new = total_incHH_gross - total_expenditure
+foreach inctype in rent selfprod privtrans govtrans business saleasset gamble{
+	gen total_incHH_`inctype' = incHH_allmem_alls+incHH_hh_`inctype'
+	gen hhsaver_totalhh_`inctype' = hhsave_new/total_incHH_`inctype'
+	gen hhexpr_totalhh_`inctype' = total_expenditure/total_incHH_`inctype'
+	gen hhincr_totalhh_`inctype' = incHH_hh_`inctype'/total_incHH_gross
+}
+gen hhsaver_totalhh_gross = hhsave_new/total_incHH_gross
+gen hhexpr_totalhh_gross = total_expenditure/total_incHH_gross
+gen share_meminc_to_hhinc = incHH_allmem_alls/total_incHH_gross
+
+ds hhsaver_totalhh_* hhexpr_totalhh_* hhincr_totalhh_* share_meminc_to_hhinc
+foreach var in `r(varlist)'{
+	replace `var'=19930412 if `var'==.
+}
+
+* Browse 
+
+
+// self prod is mainly from agricuture
+// privtrans should have different degree of share of privtrans
+// rural households should have much more govtrans
+foreach inspection_type in selfprod privtrans govtrans{
+	disp("`inspection_type'")
+	sum hhincr_totalhh_`inspection_type', detail 
+	sum hhincr_totalhh_`inspection_type' if hhincr_totalhh_`inspection_type'~=19930412, detail 
+	sum hhincr_totalhh_`inspection_type' if hhincr_totalhh_`inspection_type'~=19930412 & region_type=="URBAN", detail 
+	sum hhincr_totalhh_`inspection_type' if hhincr_totalhh_`inspection_type'~=19930412 & region_type=="RURAL", detail 
+	}
+
+
+sum share_meminc_to_hhinc , detail
+sum share_meminc_to_hhinc if share_meminc_to_hhinc~=19930412, detail
+
+foreach object in hhsaver_totalhh_gross hhexpr_totalhh_gross share_meminc_to_hhinc{
+	disp("`object'")
+	sum `object' if `object'~=19930412, detail 
+	sum `object' if `object'~=19930412 & date_m==tm(2017m4), detail 
+	sum `object' if `object'~=19930412 & date_m==tm(2017m10) , detail 
+}
+
+
+* Define materials for engle curve (scatter income exp_of_a_kind)
+* log income and log expenditure
+
+* expenditure share of various bigger kinds
+foreach exptype in food intoxicants clothfoot appliances health{
+	gen hhexpshare_`exptype'= m_expns_`exptype'/ total_incHH_gross
+	replace hhexpshare_`exptype'=19930412 if total_incHH_gross==0
+	disp("hhexpshare_`exptype'")
+	sum hhexpshare_`exptype' if hhexpshare_`exptype'~=19930412, detail 
+	sum hhexpshare_`exptype' if hhexpshare_`exptype'~=19930412 & date_m==tm(2017m4), detail 
+	sum hhexpshare_`exptype' if hhexpshare_`exptype'~=19930412 & date_m==tm(2017m10) , detail 
+	gen loghhmexp_`exptype'=log(m_expns_`exptype'+1)
+}
+gen logtotal_incHH_gross = log(total_incHH_gross+1)
+
+ 
+ * see how often the household income is coded -99
+ foreach var in incHH_hh_alls incHH_hh_rent incHH_hh_selfprod incHH_hh_privtrans incHH_hh_govtrans incHH_hh_business incHH_hh_saleasset incHH_hh_gamble incHH_hh_fdpf{
+ 	disp("`var'")
+ 	count if `var'==-99
+ }
+ 
+ 
+ 
+* CAVEAT: FINER CONSUMPTIONS ARE POSSIBLE , I HAVE SELECTED ONLY A FEW AGGREGATE CATEGORIES.
+
+
 save temp_expenditure_GST,replace
 sample 10
 save temp_expenditure_GST_10p, replace
@@ -405,5 +469,16 @@ sample 10
 save temp_expenditure_GST_1p, replace
 sample 10
 save temp_expenditure_GST_01p, replace
-a
+
+
+************************************************************************
+* Sanity check: whether the income of all members is consistent with household dataset
+************************************************************************
+
+
+
+use temp_expenditure_GST_1p, replace
+
+// the third one is my construction, it is equal to the first one from the household dataset. Note that the second one is the household specific income , so it can be lower thant the income of all household members, the first variable
+br incHH_allmem_alls incHH_hh_alls hhinc_all_source
 
